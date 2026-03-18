@@ -52,6 +52,45 @@ Export a complete, professionally formatted **11-slide PowerPoint (.pptx)** pres
 
 ---
 
+## Running the Tool
+
+### Option 1: Static Website (No Build Required)
+
+Simply open `index.html` in any modern browser, or serve with any static file server:
+
+```bash
+# Using Python
+python -m http.server 8000
+
+# Using Node
+npx serve .
+```
+
+Then open `http://localhost:8000` in your browser.
+
+### Option 2: React Application (Local Development)
+
+```bash
+cd react-app
+npm install
+npm start
+```
+
+This launches a full React dev server at `http://localhost:3000` with hot reloading.
+
+To build for production:
+
+```bash
+cd react-app
+npm run build
+```
+
+The built files will be in `react-app/build/` and can be deployed to any static host.
+
+> Both modes deliver the **same** complete functionality: file upload, address matching, analysis dashboard, all charts, AI metrics tab, and export features.
+
+---
+
 ## Quick Start (Local / Offline Use)
 
 1. Download or clone this repository
@@ -144,9 +183,9 @@ All libraries load from CDN. No build step required.
 
 ```
 /
-├── index.html                    Main single-page application
+├── index.html                    Static site entry point (no build required)
 ├── css/
-│   └── styles.css                Dark-theme professional styling
+│   └── styles.css                Styles for the static site
 ├── js/
 │   ├── app.js                    Core logic, CSV/PPTX export, UI state
 │   ├── matcher.js                Address matching engine (exact + fuzzy)
@@ -155,6 +194,19 @@ All libraries load from CDN. No build step required.
 ├── samples/
 │   ├── sample_system_a.csv       30 sample System A records
 │   └── sample_system_b.csv       30 sample System B records
+├── react-app/                    React application (same functionality)
+│   ├── package.json              npm dependencies
+│   ├── public/
+│   │   ├── index.html            React app HTML shell
+│   │   └── samples/              Sample files for React app
+│   ├── src/
+│   │   ├── App.jsx               Root component
+│   │   ├── engine/               ES module ports of matcher/analyzer
+│   │   ├── context/              Global state management (React Context)
+│   │   ├── components/           UI components and charts
+│   │   ├── utils/                File parsing, CSV/PPTX export utilities
+│   │   └── styles/               Ported CSS
+│   └── README.md                 React app setup instructions
 ├── infrastructure/
 │   ├── terraform/                Terraform IaC for AWS GovCloud
 │   ├── cloudformation/           CloudFormation alternative
