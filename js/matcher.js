@@ -27,6 +27,22 @@ const AddressMatcher = (() => {
         'TX','UT','VT','VA','WA','WV','WI','WY','DC','PR','GU','VI','AS','MP'
     ]);
 
+    // Soundex character-to-digit map (shared across calls)
+    const SOUNDEX_MAP = {
+        B:1,F:1,P:1,V:1, C:2,G:2,J:2,K:2,Q:2,S:2,X:2,Z:2,
+        D:3,T:3, L:4, M:5,N:5, R:6
+    };
+
+    // AI composite score weights (must sum to 1.0 for the no-geo case)
+    const AI_WEIGHTS = {
+        jaccard:    0.20,
+        jaroWinkler:0.25,
+        nGram:      0.20,
+        soundex:    0.10,
+        tokenOverlap:0.15,
+        levenshtein:0.10  // split to 0.05/0.05 when geo is available
+    };
+
     /**
      * Standardize an address string for matching
      */
@@ -137,7 +153,7 @@ const AddressMatcher = (() => {
     function calculateConfidence(recA, recB, weights) {
         const w = weights || { zip: 40, state: 30, city: 20, street: 10 };
         const bonus = {
-            addressLine2: w.addressLine2 || 0,
+            address2: w.address2 || 0,
             county: w.county || 0,
             zipPlus4: w.zipPlus4 || 0,
             carrierRoute: w.carrierRoute || 0,
@@ -190,7 +206,7 @@ const AddressMatcher = (() => {
 
         // Optional bonus fields — each adds a proportional boost if both records have values
         const bonusFields = [
-            { key: 'address2',             weight: bonus.addressLine2,           scoreA: recA.address2,             scoreB: recB.address2 },
+            { key: 'address2',             weight: bonus.address2,               scoreA: recA.address2,             scoreB: recB.address2 },
             { key: 'county',               weight: bonus.county,                 scoreA: recA.county,               scoreB: recB.county },
             { key: 'zipPlus4',             weight: bonus.zipPlus4,               scoreA: recA.zipPlus4,             scoreB: recB.zipPlus4 },
             { key: 'carrierRoute',         weight: bonus.carrierRoute,           scoreA: recA.carrierRoute,         scoreB: recB.carrierRoute },
@@ -205,6 +221,7 @@ const AddressMatcher = (() => {
             if (scoreA && scoreB) {
                 bonusScore += stringSimilarity(String(scoreA), String(scoreB)) * 100 * weight;
             } else if (!scoreA && !scoreB) {
+                // Both fields absent: treat as neutral (50%) to avoid penalizing incomplete records
                 bonusScore += 50 * weight;
             }
         });
@@ -486,12 +503,10 @@ const AddressMatcher = (() => {
         if (!str || typeof str !== 'string') return '0000';
         const s = str.toUpperCase().replace(/[^A-Z]/g, '');
         if (!s.length) return '0000';
-        const MAP = { B:1,F:1,P:1,V:1, C:2,G:2,J:2,K:2,Q:2,S:2,X:2,Z:2,
-                       D:3,T:3, L:4, M:5,N:5, R:6 };
         let code = s[0];
-        let prev = MAP[s[0]] || 0;
+        let prev = SOUNDEX_MAP[s[0]] || 0;
         for (let i = 1; i < s.length && code.length < 4; i++) {
-            const curr = MAP[s[i]] || 0;
+            const curr = SOUNDEX_MAP[s[i]] || 0;
             if (curr && curr !== prev) { code += curr; }
             prev = curr || prev;
         }
@@ -662,11 +677,20 @@ const AddressMatcher = (() => {
                 parseFloat(recA.lat), parseFloat(recA.lon),
                 parseFloat(recB.lat), parseFloat(recB.lon)
             ).score;
-            score = jaccard * 0.20 + jw * 0.25 + ngram * 0.20 + soundex * 0.10 +
-                    overlap * 0.15 + levSim * 0.05 + geo * 0.05;
+            score = jaccard      * AI_WEIGHTS.jaccard +
+                    jw           * AI_WEIGHTS.jaroWinkler +
+                    ngram        * AI_WEIGHTS.nGram +
+                    soundex      * AI_WEIGHTS.soundex +
+                    overlap      * AI_WEIGHTS.tokenOverlap +
+                    levSim       * (AI_WEIGHTS.levenshtein / 2) +
+                    geo          * (AI_WEIGHTS.levenshtein / 2);
         } else {
-            score = jaccard * 0.20 + jw * 0.25 + ngram * 0.20 + soundex * 0.10 +
-                    overlap * 0.15 + levSim * 0.10;
+            score = jaccard      * AI_WEIGHTS.jaccard +
+                    jw           * AI_WEIGHTS.jaroWinkler +
+                    ngram        * AI_WEIGHTS.nGram +
+                    soundex      * AI_WEIGHTS.soundex +
+                    overlap      * AI_WEIGHTS.tokenOverlap +
+                    levSim       * AI_WEIGHTS.levenshtein;
         }
 
         return Math.min(100, Math.max(0, Math.round(score)));
