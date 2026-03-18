@@ -389,8 +389,8 @@ const DataAnalyzer = (() => {
 
         // False positive estimate: matches with score < 60
         const falsePositiveEstimate = matched.filter(m => m.score < 60).length;
-        const precision = (totalMatched + falsePositiveEstimate) > 0
-            ? totalMatched / (totalMatched + falsePositiveEstimate) : 0;
+        const truePositiveEstimate  = totalMatched - falsePositiveEstimate;
+        const precision = totalMatched > 0 ? truePositiveEstimate / totalMatched : 0;
 
         // Recall: matched / min(totalA, totalB)
         const recall = Math.min(totalA, totalB) > 0
@@ -451,18 +451,10 @@ const DataAnalyzer = (() => {
             });
         }
 
-        // Gini Coefficient of score distribution
+        // Gini Coefficient of score distribution (capped sample for O(n²) performance)
         let gini = 0;
         if (totalMatched > 1) {
             const sortedScores = [...matched.map(m => m.score)].sort((a, b) => a - b);
-            let sumOfAbsDiffs = 0;
-            const mean = avgMatchScore;
-            for (let i = 0; i < sortedScores.length; i++) {
-                for (let j = 0; j < sortedScores.length; j++) {
-                    sumOfAbsDiffs += Math.abs(sortedScores[i] - sortedScores[j]);
-                }
-            }
-            // Cap at 500 pairs for performance
             const sampleSize = Math.min(totalMatched, 500);
             const sample = sortedScores.slice(0, sampleSize);
             let sampleDiff = 0;

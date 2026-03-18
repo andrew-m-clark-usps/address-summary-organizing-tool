@@ -1173,7 +1173,7 @@ const App = (() => {
                 });
                 const dqUrl = Visualizations.getChartDataUrl('chart-ai-dq-comparison');
                 if (dqUrl) {
-                    slideDQ.addImage({ data: dqUrl, x: 0.5, y: 3.2, w: 0, h: 0 }); // placeholder — chart is narrow
+                    slideDQ.addImage({ data: dqUrl, x: 1.5, y: 7.0, w: 4.0, h: 0.5 });
                 }
             }
 
