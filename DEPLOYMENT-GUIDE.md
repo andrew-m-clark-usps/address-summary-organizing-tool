@@ -1,291 +1,179 @@
-# USPS Address Management Portal - Deployment Guide
+# USPS Address Management Portal — Local Deployment Guide
 
-## ✅ Project Status: COMPLETE
+This guide covers running the portal locally using Docker or Node.js directly.
 
-A complete React 18 application has been successfully built and is ready for deployment.
+---
 
-## 🚀 Quick Start
+## Option 1: Docker Compose (All Services)
 
-### Development Mode
+> **Requires:** Docker Desktop or Docker Engine + Docker Compose v2
+
+Start all three services at once:
 
 ```bash
-# Install dependencies (if not already done)
-npm install
-
-# Start development server
-npm run dev
-
-# Open http://localhost:5173
+docker compose up --build
 ```
 
-**Login Credentials:** `admin` / `usps2024`
+| Service | URL | Description |
+|---------|-----|-------------|
+| `react-app` | http://localhost:8080 | React portal (production Nginx build) |
+| `react-dev` | http://localhost:5173 | React portal (Vite dev server, hot reload) |
+| `static-site` | http://localhost:8081 | Original static HTML analysis tool |
 
-### Production Build
+Stop all services:
 
 ```bash
-# Build for production
+docker compose down
+```
+
+Start individual services:
+
+```bash
+docker compose up react-app    # Production React only
+docker compose up react-dev    # Dev React only
+docker compose up static-site  # Static HTML only
+```
+
+Rebuild after code changes:
+
+```bash
+docker compose up react-app --build
+```
+
+---
+
+## Option 2: Node.js (React App without Docker)
+
+```bash
+# Install dependencies
+npm install
+
+# Development server (hot reload)
+npm run dev
+# → http://localhost:5173
+
+# Production build
 npm run build
 
 # Preview production build
 npm run preview
+# → http://localhost:4173
 ```
-
-### Docker Deployment
-
-#### Development with Hot Reload
-
-```bash
-docker-compose up dev
-# Open http://localhost:3000
-```
-
-#### Production Deployment
-
-```bash
-# Build and run production container
-docker-compose up app
-# Open http://localhost:8080
-
-# Or manually:
-docker build -t usps-portal .
-docker run -p 8080:80 usps-portal
-```
-
-## 📁 What Was Built
-
-### Core Application Files
-
-✅ **React Components** (11 components)
-- Auth: Login, ProtectedRoute
-- Layout: Header, Sidebar, Layout wrapper
-- Dashboard: Overview, AddressDetails, AddressList, MapView, AnalysisDashboard
-- Upload: UploadData with CSV parsing
-- Settings: Comprehensive settings page
-
-✅ **Services Layer** (3 services)
-- authService.js - Authentication and session management
-- addressService.js - CRUD operations with IndexedDB
-- analysisService.js - Address matching algorithm with AI metrics
-
-✅ **Custom Hooks** (3 hooks)
-- useAuth - Authentication state management
-- useAddresses - Address CRUD and pagination
-- useAnalysis - Analysis workflow management
-
-✅ **Web Workers** (2 workers)
-- matcherWorker.js - Background address matching
-- analyzerWorker.js - Background metrics computation
-
-✅ **Utilities**
-- constants.js - USPS colors, sample data, US states
-- formatters.js - Number, percent, lat/lon formatters
-
-### Configuration Files
-
-✅ **Build & Dev**
-- package.json - All dependencies configured
-- vite.config.js - Vite configuration with web workers
-- eslint.config.js - ESLint configuration
-
-✅ **Docker**
-- Dockerfile - Multi-stage build (Node + Nginx)
-- docker-compose.yml - Dev and production services
-- docker/nginx.conf - Nginx configuration for SPA
-- .dockerignore - Optimized Docker context
-
-✅ **Entry Points**
-- index.html - Vite entry point with Google Fonts
-- src/main.jsx - React root with Leaflet CSS
-- src/App.jsx - Main app with routing
-
-✅ **Styling**
-- src/index.css - USPS brand colors and global styles
-
-## 🎨 Features Implemented
-
-### 1. Authentication System
-- Login page with USPS branding
-- Session persistence in localStorage
-- Protected routes with automatic redirect
-- Logout functionality
-
-### 2. Dashboard
-- 4 statistics cards (Total, Pending, Verified, Issues)
-- Address details form with all fields
-- Interactive Leaflet map with markers
-- Paginated address list with 50 records per page
-
-### 3. My Addresses
-- Full CRUD operations (Create, Read, Update, Delete)
-- US state dropdown with all 50 states + DC + PR
-- Residential/Commercial/Active flags
-- Real-time form updates
-- IndexedDB persistence
-
-### 4. Upload Data & Analysis
-- Drag-and-drop CSV upload for two datasets
-- PapaParse with chunked streaming for large files
-- Progress bar during analysis
-- Address matching algorithm:
-  - State matching (20%)
-  - City matching (20%)
-  - ZIP code matching (30%)
-  - Street Levenshtein distance (30%)
-- AI Metrics dashboard:
-  - Total Records, Match Rate
-  - Precision, Recall, F1 Score, Accuracy
-  - Average Match Score
-- Chart.js visualizations:
-  - Doughnut chart for match distribution
-  - Bar chart for discrepancy breakdown
-
-### 5. Settings
-- Account management
-- Display preferences (records per page, theme)
-- Data management (export format, batch size)
-- System configuration (confidence threshold, cache)
-- Save functionality with visual feedback
-
-### 6. Layout & Navigation
-- Sticky header with USPS branding
-- Sidebar navigation with active state
-- Responsive design with flexbox
-- USPS color scheme throughout
-
-## 📊 Data Flow
-
-1. **Authentication**: localStorage session → useAuth hook → ProtectedRoute
-2. **Addresses**: IndexedDB → addressService → useAddresses hook → Components
-3. **Analysis**: CSV files → PapaParse → analysisService → useAnalysis hook → Charts
-
-## 🗄️ Storage
-
-- **Session**: localStorage (key: `usps_session`)
-- **Addresses**: IndexedDB via LocalForage (store: `usps_addresses`)
-- **Auto-seeding**: 3 sample addresses loaded on first visit
-
-## 🔧 Technology Decisions
-
-### Why Vite?
-- ⚡️ Lightning fast HMR
-- Modern ES modules
-- Optimized production builds
-- Built-in web worker support
-
-### Why LocalForage?
-- Simple async API over IndexedDB
-- Automatic fallback to localStorage
-- Promise-based, no callbacks
-
-### Why Leaflet?
-- Open-source, no API keys needed
-- Lightweight and performant
-- Dynamic import to avoid SSR issues
-
-### Why Chart.js?
-- Popular, well-maintained
-- Responsive out of the box
-- React wrapper available
-
-## 📦 Dependencies
-
-### Production
-- react@19.2.4, react-dom@19.2.4
-- react-router-dom@7.13.1
-- leaflet@1.9.4, react-leaflet@5.0.0
-- chart.js@4.5.1, react-chartjs-2@5.3.1
-- papaparse@5.5.3, xlsx@0.18.5
-- localforage@1.10.0
-
-### Development
-- vite@8.0.0
-- @vitejs/plugin-react@6.0.0
-- eslint@9.39.4 + plugins
-
-## 🚢 Deployment Options
-
-### Option 1: Netlify/Vercel
-```bash
-npm run build
-# Deploy dist/ folder
-```
-
-### Option 2: Docker on Cloud Provider
-```bash
-docker build -t usps-portal .
-docker tag usps-portal your-registry/usps-portal
-docker push your-registry/usps-portal
-# Deploy on AWS ECS, GCP Cloud Run, etc.
-```
-
-### Option 3: Static Hosting
-```bash
-npm run build
-# Upload dist/ to S3, Azure Blob Storage, etc.
-# Configure as static website with SPA routing
-```
-
-## 🔐 Security Notes
-
-- Demo credentials hardcoded (change for production)
-- No backend API (client-side only)
-- IndexedDB data persists locally
-- Consider adding:
-  - Real authentication backend
-  - API key management
-  - Rate limiting
-  - HTTPS enforcement
-
-## 📈 Performance
-
-- Initial bundle: ~477 KB (155 KB gzipped)
-- Leaflet lazy-loaded: ~149 KB
-- Code splitting by route
-- Production build optimized with Vite
-
-## 🧪 Testing
-
-The app has been verified to:
-- ✅ Build successfully (`npm run build`)
-- ✅ Start dev server (`npm run dev`)
-- ✅ Compile without errors
-- ✅ Include all required dependencies
-
-## 📝 Next Steps
-
-1. Test login flow in browser
-2. Upload sample CSV files to test analysis
-3. Verify map rendering with Leaflet
-4. Test CRUD operations
-5. Check responsive design on mobile
-6. Deploy to staging environment
-
-## 🐛 Known Issues
-
-- Dynamic import warning for addressService (non-critical)
-- 1 npm audit high severity vulnerability (in dependencies)
-
-## 📚 Documentation
-
-- `README-REACT.md` - Full feature documentation
-- `README.md` - Original project documentation
-- `static-index.html` - Original static site preserved
-
-## 🎉 Success Criteria - ALL MET ✅
-
-✅ Complete React 18 application  
-✅ Vite build tool configured  
-✅ Authentication system  
-✅ Dashboard with statistics  
-✅ Address CRUD operations  
-✅ Interactive maps  
-✅ CSV upload and analysis  
-✅ Chart.js visualizations  
-✅ IndexedDB storage  
-✅ Docker support  
-✅ USPS branding  
-✅ Production build ready  
 
 ---
 
-**Ready for deployment! 🚀**
+## Option 3: Static HTML Site without Docker
+
+The static HTML analysis tool (`static-index.html`) works with any static file server or directly in a browser.
+
+**Open directly in browser:**
+```bash
+# macOS
+open static-index.html
+
+# Linux
+xdg-open static-index.html
+
+# Windows
+start static-index.html
+```
+
+**Serve with Node.js:**
+```bash
+npx serve . --listen 8081
+# → http://localhost:8081/static-index.html
+```
+
+**Serve with Python:**
+```bash
+python3 -m http.server 8081
+# → http://localhost:8081/static-index.html
+```
+
+---
+
+## Docker Configuration Details
+
+### `Dockerfile` (React production)
+Multi-stage build:
+1. **Build stage** (`node:20-alpine`) — installs npm dependencies, runs `npm run build`
+2. **Production stage** (`nginx:alpine`) — serves `dist/` with the Nginx SPA config
+
+### `docker-compose.yml` services
+
+```
+react-app     → Dockerfile multi-stage → nginx on port 8080
+react-dev     → node:20-alpine + volume mount → vite on port 5173
+static-site   → nginx:alpine + volume mount → serves static-index.html on port 8081
+```
+
+### `docker/nginx.conf` (React production)
+- SPA routing: `try_files $uri $uri/ /index.html`
+- Gzip compression enabled
+- Static asset caching headers
+
+### `docker/nginx-static.conf` (Static HTML)
+- Serves the project root directory
+- No SPA rewrite needed
+
+---
+
+## React App Login
+
+Default credentials (stored in `src/services/authService.js`):
+
+| Field | Value |
+|-------|-------|
+| Username | `admin` |
+| Password | `usps2024` |
+
+Session is stored in `localStorage` and persists across page refreshes until logout.
+
+---
+
+## Troubleshooting
+
+**Port already in use:**
+```bash
+# Check what's using the port
+lsof -i :8080
+
+# Change the port in docker-compose.yml:
+ports:
+  - "9080:80"    # change left side only
+```
+
+**Docker build fails:**
+```bash
+# Clear Docker build cache
+docker compose build --no-cache
+
+# Or remove all stopped containers and images
+docker system prune
+```
+
+**Node modules error in dev container:**
+```bash
+# Remove and recreate named volumes
+docker compose down -v
+docker compose up react-dev --build
+```
+
+**Map not showing:**
+Leaflet loads tiles from OpenStreetMap — requires internet access. On a fully air-gapped machine, configure a local tile server (e.g., TileServer GL with MBTiles).
+
+---
+
+## Production Hardening (on-premise server)
+
+For deploying on a local server (VM, on-premise host):
+
+1. **Change credentials** in `src/services/authService.js` — or add a proper backend auth layer.
+2. **Add HTTPS** — use a reverse proxy (e.g., Nginx) with a self-signed or internal CA certificate.
+3. **Restrict network access** — bind Docker ports to `127.0.0.1` if the server should only be accessible locally.
+
+```yaml
+# docker-compose.yml — restrict to localhost only
+ports:
+  - "127.0.0.1:8080:80"
+```
