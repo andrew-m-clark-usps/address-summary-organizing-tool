@@ -1,32 +1,32 @@
 /* ===== CSS VARIABLES ===== */
 :root {
-    --color-perfect: #10B981;
-    --color-high: #84CC16;
-    --color-partial: #F59E0B;
-    --color-low: #F97316;
-    --color-none: #EF4444;
-    --color-system-a: #3B82F6;
-    --color-system-b: #8B5CF6;
-    --color-complete: #10B981;
-    --color-incomplete: #F59E0B;
+    --color-perfect: #059669;
+    --color-high: #65A30D;
+    --color-partial: #D97706;
+    --color-low: #EA580C;
+    --color-none: #DC2626;
+    --color-system-a: #2563EB;
+    --color-system-b: #D97706;
+    --color-complete: #059669;
+    --color-incomplete: #D97706;
 
-    --bg-primary: #0F172A;
-    --bg-secondary: #1E293B;
-    --bg-card: #1E293B;
-    --bg-card-hover: #243447;
-    --border-color: #334155;
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
-    --accent: #3B82F6;
-    --accent-hover: #2563EB;
-    --success: #10B981;
-    --warning: #F59E0B;
-    --danger: #EF4444;
+    --bg-primary: #F9FAFB;
+    --bg-secondary: #FFFFFF;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #F3F4F6;
+    --border-color: #E5E7EB;
+    --text-primary: #1F2937;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+    --accent: #2563EB;
+    --accent-hover: #1D4ED8;
+    --success: #059669;
+    --warning: #D97706;
+    --danger: #DC2626;
     --radius: 12px;
     --radius-sm: 6px;
-    --shadow: 0 4px 24px rgba(0,0,0,0.3);
-    --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+    --shadow: 0 4px 16px rgba(0,0,0,0.08);
+    --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
     --transition: all 0.2s ease;
 }
 
@@ -60,10 +60,7 @@ body {
 .app-header h1 {
     font-size: 1.5rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -467,12 +464,12 @@ th.sorted-desc::after { content: ' ↓'; }
 
 td {
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.8);
     color: var(--text-primary);
     white-space: nowrap;
 }
 
-tr:hover td { background: rgba(255,255,255,0.02); }
+tr:hover td { background: rgba(0,0,0,0.02); }
 
 /* ===== CONFIDENCE BADGES ===== */
 .badge {
@@ -594,7 +591,7 @@ select.filter-input {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(249, 250, 251, 0.92);
     z-index: 1000;
     align-items: center;
     justify-content: center;
@@ -640,27 +637,27 @@ select.filter-input {
 }
 
 .alert-info {
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    color: #93C5FD;
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    color: #1D4ED8;
 }
 
 .alert-success {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    color: #6EE7B7;
+    background: rgba(5, 150, 105, 0.08);
+    border: 1px solid rgba(5, 150, 105, 0.25);
+    color: #065F46;
 }
 
 .alert-warning {
-    background: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    color: #FDE68A;
+    background: rgba(217, 119, 6, 0.08);
+    border: 1px solid rgba(217, 119, 6, 0.25);
+    color: #92400E;
 }
 
 .alert-danger {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #FCA5A5;
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    color: #991B1B;
 }
 
 /* ===== SECTION HEADERS ===== */
@@ -800,9 +797,46 @@ select.filter-input {
 
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-track { background: #F9FAFB; }
 ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ===== LANDING PAGE ===== */
+#landing-page {
+    max-width: 900px;
+    margin: 3rem auto;
+    padding: 0 2rem;
+}
+
+.landing-hero {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.landing-hero h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+}
+
+.landing-hero p {
+    font-size: 1.0625rem;
+    color: var(--text-secondary);
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.7;
+}
+
+#landing-page .card {
+    box-shadow: var(--shadow);
+}
+
+/* ===== EXPORT CARD (featured) ===== */
+.export-card-featured {
+    border-color: var(--accent);
+    background: rgba(37, 99, 235, 0.04);
+}
 
 /* ===== EMPTY STATE ===== */
 .empty-state {
@@ -841,8 +875,8 @@ select.filter-input {
     bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: #0F172A;
-    color: var(--text-primary);
+    background: #1F2937;
+    color: #F9FAFB;
     padding: 0.375rem 0.625rem;
     border-radius: var(--radius-sm);
     font-size: 0.75rem;

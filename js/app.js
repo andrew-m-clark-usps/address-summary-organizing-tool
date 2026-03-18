@@ -115,6 +115,21 @@ const App = (() => {
         state.currentTab = tabName;
     }
 
+    function showLandingPage() {
+        document.getElementById('landing-page').style.display = '';
+        document.getElementById('analysis-view').style.display = 'none';
+        document.getElementById('header-landing-actions').style.display = '';
+        document.getElementById('header-analysis-actions').style.display = 'none';
+    }
+
+    function showAnalysisView() {
+        document.getElementById('landing-page').style.display = 'none';
+        document.getElementById('analysis-view').style.display = '';
+        document.getElementById('header-landing-actions').style.display = 'none';
+        document.getElementById('header-analysis-actions').style.display = '';
+        showTab('dashboard');
+    }
+
     function showLoading(text, sub) {
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
@@ -228,21 +243,12 @@ const App = (() => {
 
             hideLoading();
             renderDashboard();
-            showTab('dashboard');
-            enableAnalysisTabs();
+            showAnalysisView();
         } catch (err) {
             hideLoading();
             showAlert('analyze-alert', 'danger', 'Analysis failed: ' + err.message);
             console.error(err);
         }
-    }
-
-    function enableAnalysisTabs() {
-        document.querySelectorAll('.nav-tab[data-requires-analysis]').forEach(tab => {
-            tab.disabled = false;
-            tab.style.opacity = '';
-        });
-        document.getElementById('export-pptx-btn').disabled = false;
     }
 
     // ===== DASHBOARD RENDERING =====
@@ -879,9 +885,29 @@ const App = (() => {
         // Tab navigation
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', () => {
-                if (tab.dataset.requiresAnalysis && !state.analysis) return;
                 showTab(tab.dataset.tab);
             });
+        });
+
+        // Start over button
+        document.getElementById('btn-start-over')?.addEventListener('click', () => {
+            state.dataA = null;
+            state.dataB = null;
+            state.matchResults = null;
+            state.analysis = null;
+            // Reset upload zones
+            ['a', 'b'].forEach(sys => {
+                const infoEl = document.getElementById(`file-info-${sys}`);
+                const zoneEl = document.getElementById(`upload-zone-${sys}`);
+                const input  = document.getElementById(`file-input-${sys}`);
+                if (infoEl) { infoEl.textContent = ''; infoEl.classList.remove('visible'); }
+                if (zoneEl) zoneEl.classList.remove('loaded');
+                if (input)  input.value = '';
+                clearAlert(`upload-alert-${sys}`);
+            });
+            clearAlert('analyze-alert');
+            updateAnalyzeButton();
+            showLandingPage();
         });
 
         // File upload
