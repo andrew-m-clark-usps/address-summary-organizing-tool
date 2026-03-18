@@ -19,48 +19,20 @@
     </div>
 </div>
 
-<!-- Header -->
-<header class="app-header">
-    <div>
+<!-- Landing Page -->
+<div id="landing-page" class="landing-page">
+    <div class="landing-header">
         <h1>📊 Address Summary Organizing Tool</h1>
-        <div class="header-subtitle">Dual-system address matching &amp; analysis with comprehensive visualizations</div>
+        <p>Upload two address datasets to compare them side-by-side. The tool will match records, identify discrepancies, and produce a full geographic and quality breakdown — ready for export.</p>
     </div>
-    <div class="flex gap-3 items-center">
-        <button id="export-pptx-btn" class="btn btn-secondary btn-sm" disabled title="Export analysis to PowerPoint">
-            📑 Export PowerPoint
-        </button>
-        <a href="samples/sample_system_a.csv" download class="btn btn-secondary btn-sm">⬇ Sample A</a>
-        <a href="samples/sample_system_b.csv" download class="btn btn-secondary btn-sm">⬇ Sample B</a>
-    </div>
-</header>
 
-<!-- Navigation -->
-<nav class="nav-tabs" role="tablist">
-    <button class="nav-tab active" data-tab="upload" role="tab">📁 Upload &amp; Configure</button>
-    <button class="nav-tab" data-tab="dashboard" data-requires-analysis="1" role="tab">📊 Dashboard</button>
-    <button class="nav-tab" data-tab="match-summary" data-requires-analysis="1" role="tab">✅ Match Summary</button>
-    <button class="nav-tab" data-tab="geographic" data-requires-analysis="1" role="tab">🗺 Geographic</button>
-    <button class="nav-tab" data-tab="quality" data-requires-analysis="1" role="tab">🔍 Address Quality</button>
-    <button class="nav-tab" data-tab="results" data-requires-analysis="1" role="tab">📋 Detailed Results</button>
-    <button class="nav-tab" data-tab="export" data-requires-analysis="1" role="tab">💾 Export</button>
-</nav>
-
-<main class="main-content">
-
-    <!-- ═══════════════ TAB: UPLOAD ═══════════════ -->
-    <section id="tab-upload" class="tab-content active fade-in">
-        <div class="section-header">
-            <div>
-                <div class="section-title">Upload &amp; Configure</div>
-                <div class="section-subtitle">Load two datasets to compare — supports CSV and Excel (.xlsx/.xls)</div>
-            </div>
-        </div>
-
+    <div class="landing-body">
+        <!-- Upload Zones -->
         <div class="upload-grid">
             <!-- System A -->
             <div class="card">
                 <div class="card-title">
-                    <span style="color:var(--color-system-a)">■</span> System A
+                    <span style="color:var(--color-system-a)">■</span> Dataset A
                 </div>
                 <div id="upload-zone-a" class="upload-zone">
                     <input type="file" id="file-input-a" accept=".csv,.xlsx,.xls">
@@ -76,7 +48,7 @@
             <!-- System B -->
             <div class="card">
                 <div class="card-title">
-                    <span style="color:var(--color-system-b)">■</span> System B
+                    <span style="color:var(--color-system-b)">■</span> Dataset B
                 </div>
                 <div id="upload-zone-b" class="upload-zone">
                     <input type="file" id="file-input-b" accept=".csv,.xlsx,.xls">
@@ -90,7 +62,7 @@
             </div>
         </div>
 
-        <!-- Configuration -->
+        <!-- Matching Configuration -->
         <div class="card">
             <div class="card-title">⚙️ Matching Configuration</div>
             <div class="threshold-controls">
@@ -143,11 +115,16 @@
             </div>
 
             <div id="analyze-alert" class="mt-2"></div>
-            <div class="mt-3">
+            <div class="landing-run">
                 <button id="btn-analyze" class="btn btn-success btn-lg" disabled>
                     🔍 Run Analysis
                 </button>
-                <span class="text-sm text-muted" style="margin-left:1rem">Load both files to enable</span>
+                <span class="text-sm text-muted">Load both files to enable</span>
+            </div>
+            <div class="landing-samples">
+                <span>Try with sample data:</span>
+                <a href="samples/sample_system_a.csv" download class="btn btn-secondary btn-sm">⬇ Sample A</a>
+                <a href="samples/sample_system_b.csv" download class="btn btn-secondary btn-sm">⬇ Sample B</a>
             </div>
         </div>
 
@@ -174,10 +151,40 @@
                 </div>
             </div>
         </div>
-    </section>
+    </div><!-- end landing-body -->
+</div><!-- end landing-page -->
+
+<!-- Analysis View -->
+<div id="analysis-view" class="analysis-view">
+
+<!-- Header -->
+<header class="app-header">
+    <div>
+        <h1>📊 Address Summary Organizing Tool</h1>
+        <div class="header-subtitle">Dual-system address matching &amp; analysis</div>
+    </div>
+    <div class="flex gap-3 items-center">
+        <button id="btn-new-analysis" class="btn btn-secondary btn-sm" title="Return to upload page">↩ New Analysis</button>
+        <button id="export-pptx-btn" class="btn btn-secondary btn-sm" title="Export analysis to PowerPoint">
+            📑 Export PowerPoint
+        </button>
+    </div>
+</header>
+
+<!-- Navigation -->
+<nav class="nav-tabs" role="tablist">
+    <button class="nav-tab active" data-tab="dashboard" role="tab">📊 Dashboard</button>
+    <button class="nav-tab" data-tab="match-summary" role="tab">✅ Match Summary</button>
+    <button class="nav-tab" data-tab="geographic" role="tab">🗺 Geographic</button>
+    <button class="nav-tab" data-tab="quality" role="tab">🔍 Address Quality</button>
+    <button class="nav-tab" data-tab="results" role="tab">📋 Detailed Results</button>
+    <button class="nav-tab" data-tab="export" role="tab">💾 Export</button>
+</nav>
+
+<main class="main-content">
 
     <!-- ═══════════════ TAB: DASHBOARD ═══════════════ -->
-    <section id="tab-dashboard" class="tab-content fade-in">
+    <section id="tab-dashboard" class="tab-content active fade-in">
         <div class="section-header">
             <div>
                 <div class="section-title">Analysis Dashboard</div>
@@ -546,7 +553,7 @@
         <div id="export-alert" class="mb-3"></div>
 
         <!-- PowerPoint Export (featured) -->
-        <div class="card mb-4" style="border-color:var(--accent);background:rgba(59,130,246,0.05)">
+        <div class="card mb-4" style="border-color:var(--accent);background:rgba(37,99,235,0.04)">
             <div class="card-title" style="color:var(--accent)">📑 PowerPoint Presentation Export</div>
             <p class="text-sm text-secondary mb-3">
                 Generate a complete, professional PowerPoint (.pptx) presentation with all analysis breakdowns,
@@ -638,6 +645,8 @@
     </section>
 
 </main>
+
+</div><!-- end analysis-view -->
 
 <!-- CDN Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>

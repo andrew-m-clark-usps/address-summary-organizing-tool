@@ -228,6 +228,7 @@ const App = (() => {
 
             hideLoading();
             renderDashboard();
+            transitionToAnalysisView();
             showTab('dashboard');
             enableAnalysisTabs();
         } catch (err) {
@@ -238,11 +239,52 @@ const App = (() => {
     }
 
     function enableAnalysisTabs() {
-        document.querySelectorAll('.nav-tab[data-requires-analysis]').forEach(tab => {
-            tab.disabled = false;
-            tab.style.opacity = '';
-        });
         document.getElementById('export-pptx-btn').disabled = false;
+    }
+
+    // ===== TWO-PAGE FLOW =====
+    function transitionToAnalysisView() {
+        document.getElementById('landing-page').style.display = 'none';
+        const analysisView = document.getElementById('analysis-view');
+        analysisView.classList.add('visible');
+    }
+
+    function transitionToLandingPage() {
+        // Reset analysis state
+        state.dataA = null;
+        state.dataB = null;
+        state.matchResults = null;
+        state.analysis = null;
+
+        // Reset upload zones
+        ['a', 'b'].forEach(s => {
+            const infoEl = document.getElementById('file-info-' + s);
+            const zoneEl = document.getElementById('upload-zone-' + s);
+            const inputEl = document.getElementById('file-input-' + s);
+            if (infoEl) { infoEl.textContent = ''; infoEl.classList.remove('visible'); }
+            if (zoneEl) zoneEl.classList.remove('loaded');
+            if (inputEl) inputEl.value = '';
+            clearAlert('upload-alert-' + s);
+        });
+        clearAlert('analyze-alert');
+        updateAnalyzeButton();
+
+        // Reset export button
+        document.getElementById('export-pptx-btn').disabled = true;
+
+        // Show landing page, hide analysis view
+        document.getElementById('landing-page').style.display = '';
+        const analysisView = document.getElementById('analysis-view');
+        analysisView.classList.remove('visible');
+
+        // Reset to dashboard tab for next run
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+        const dash = document.getElementById('tab-dashboard');
+        const dashTab = document.querySelector('.nav-tab[data-tab="dashboard"]');
+        if (dash) dash.classList.add('active');
+        if (dashTab) dashTab.classList.add('active');
+        state.currentTab = 'dashboard';
     }
 
     // ===== DASHBOARD RENDERING =====
@@ -879,10 +921,12 @@ const App = (() => {
         // Tab navigation
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', () => {
-                if (tab.dataset.requiresAnalysis && !state.analysis) return;
                 showTab(tab.dataset.tab);
             });
         });
+
+        // New Analysis button
+        document.getElementById('btn-new-analysis')?.addEventListener('click', transitionToLandingPage);
 
         // File upload
         document.getElementById('file-input-a').addEventListener('change', (e) => handleFileUpload(e.target, 'a'));
@@ -989,5 +1033,5 @@ const App = (() => {
         init();
     }
 
-    return { state, runAnalysis, exportPowerPoint };
+    return { state, runAnalysis, exportPowerPoint, transitionToLandingPage };
 })();
