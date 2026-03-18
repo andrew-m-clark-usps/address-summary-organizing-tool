@@ -221,7 +221,7 @@ const App = (() => {
         await new Promise(resolve => setTimeout(resolve, 50));
 
         try {
-            const total = state.dataA.records.length;
+            const matchStart = Date.now();
             state.matchResults = AddressMatcher.matchRecords(
                 state.dataA.records,
                 state.dataB.records,
@@ -234,11 +234,13 @@ const App = (() => {
                     }
                 }
             );
+            const processingMs = Date.now() - matchStart;
 
             state.analysis = DataAnalyzer.runFullAnalysis(
                 state.dataA.records,
                 state.dataB.records,
-                state.matchResults
+                state.matchResults,
+                processingMs
             );
 
             hideLoading();
@@ -276,6 +278,10 @@ const App = (() => {
         renderMatchedTable();
         renderUnmatchedATable();
         renderUnmatchedBTable();
+
+        // Render AI metrics
+        renderAIMetrics();
+        renderDashboardAIInsights();
     }
 
     function setStatCard(id, value) {
@@ -339,6 +345,165 @@ const App = (() => {
                 <span class="field-pct">${completeness[f]}%</span>
             </div>
         `).join('');
+    }
+
+    // ===== AI METRICS RENDERING =====
+    function getMetricClass(value, thresholds) {
+        // thresholds: { excellent, good, fair } — values above = that tier
+        if (value >= (thresholds.excellent || 90)) return 'metric-excellent';
+        if (value >= (thresholds.good    || 70)) return 'metric-good';
+        if (value >= (thresholds.fair    || 50)) return 'metric-fair';
+        return 'metric-poor';
+    }
+
+    function metricCard(id, label, value, explain, colorClass) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.className = 'metric-card ' + (colorClass || '');
+        el.innerHTML = `
+            <div class="metric-value">${value}</div>
+            <div class="metric-label">${label}</div>
+            ${explain ? `<div class="metric-explain">${explain}</div>` : ''}
+        `;
+    }
+
+    function renderAIMetrics() {
+        if (!state.analysis || !state.analysis.aiMetrics) return;
+        const { aiMetrics, matchDetails, summary } = state.analysis;
+
+        // AI Performance Overview
+        metricCard('ai-precision', 'Precision', aiMetrics.precision + '%',
+            'True matches / (true + false positives)',
+            getMetricClass(aiMetrics.precision, { excellent: 90, good: 75, fair: 60 }));
+        metricCard('ai-recall', 'Recall', aiMetrics.recall + '%',
+            'Matched / min(total A, total B)',
+            getMetricClass(aiMetrics.recall, { excellent: 90, good: 75, fair: 60 }));
+        metricCard('ai-f1', 'F1 Score', aiMetrics.f1Score + '%',
+            'Harmonic mean of precision & recall',
+            getMetricClass(aiMetrics.f1Score, { excellent: 90, good: 75, fair: 60 }));
+        metricCard('ai-accuracy', 'Accuracy', aiMetrics.accuracy + '%',
+            'High-confidence matches / total matched',
+            getMetricClass(aiMetrics.accuracy, { excellent: 80, good: 60, fair: 40 }));
+        metricCard('ai-confidence', 'Confidence Index', aiMetrics.overallConfidence + '%',
+            'Weighted composite of score, match rate & DQ',
+            getMetricClass(aiMetrics.overallConfidence, { excellent: 85, good: 70, fair: 55 }));
+        metricCard('ai-jaccard', 'Jaccard Index', aiMetrics.jaccardIndex + '%',
+            'Intersection / union of both datasets',
+            getMetricClass(aiMetrics.jaccardIndex, { excellent: 70, good: 50, fair: 30 }));
+
+        // Data Quality Scores
+        metricCard('ai-dq-a', 'DQ Score — System A', aiMetrics.dqScoreA.toFixed(1) + '%',
+            'Completeness, validity & duplicate penalty',
+            getMetricClass(aiMetrics.dqScoreA, { excellent: 90, good: 75, fair: 60 }));
+        metricCard('ai-dq-b', 'DQ Score — System B', aiMetrics.dqScoreB.toFixed(1) + '%',
+            'Completeness, validity & duplicate penalty',
+            getMetricClass(aiMetrics.dqScoreB, { excellent: 90, good: 75, fair: 60 }));
+
+        // Match Score Statistics
+        if (matchDetails) {
+            setStatCard('ai-avg-score',    matchDetails.avgMatchScore.toFixed(1) + '%');
+            setStatCard('ai-median-score', matchDetails.medianMatchScore.toFixed(1) + '%');
+            setStatCard('ai-stddev-score', matchDetails.stdDevMatchScore.toFixed(1));
+            setStatCard('ai-min-score',    matchDetails.minMatchScore + '%');
+            setStatCard('ai-max-score',    matchDetails.maxMatchScore + '%');
+            setStatCard('ai-p10',          matchDetails.scorePercentiles.p10 + '%');
+            setStatCard('ai-p25',          matchDetails.scorePercentiles.p25 + '%');
+            setStatCard('ai-p50',          matchDetails.scorePercentiles.p50 + '%');
+            setStatCard('ai-p75',          matchDetails.scorePercentiles.p75 + '%');
+            setStatCard('ai-p90',          matchDetails.scorePercentiles.p90 + '%');
+
+            // Per-component scores
+            setStatCard('ai-street-score', matchDetails.avgStreetScore.toFixed(1) + '%');
+            setStatCard('ai-city-score',   matchDetails.avgCityScore.toFixed(1)   + '%');
+            setStatCard('ai-state-score',  matchDetails.avgStateScore.toFixed(1)  + '%');
+            setStatCard('ai-zip-score',    matchDetails.avgZipScore.toFixed(1)    + '%');
+
+            // Match type counts
+            setStatCard('ai-exact-count', formatNumber(matchDetails.exactMatchCount));
+            setStatCard('ai-fuzzy-count', formatNumber(matchDetails.fuzzyMatchCount));
+
+            // Cross-field
+            setStatCard('ai-cross-state', formatNumber(matchDetails.crossStateMatchCount));
+            setStatCard('ai-cross-zip',   formatNumber(matchDetails.crossZipMatchCount));
+            setStatCard('ai-cross-city',  formatNumber(matchDetails.crossCityMatchCount));
+            setStatCard('ai-disc-rate',   matchDetails.discrepancyRate + '%');
+            setStatCard('ai-avg-disc',    matchDetails.avgDiscrepanciesPerMatch.toFixed(2));
+            setStatCard('ai-secondary-unit', formatNumber(matchDetails.matchedWithSecondaryUnit));
+        }
+
+        // Risk & Anomaly
+        metricCard('ai-fp-risk', 'False Positive Risk', aiMetrics.falsePositiveRisk + '%',
+            'Borderline matches near threshold',
+            getMetricClass(100 - aiMetrics.falsePositiveRisk, { excellent: 85, good: 70, fair: 55 }));
+        metricCard('ai-anomaly', 'Anomaly Rate', aiMetrics.anomalyRate + '%',
+            'Duplicate or invalid ZIP/state records',
+            getMetricClass(100 - aiMetrics.anomalyRate, { excellent: 95, good: 85, fair: 70 }));
+        metricCard('ai-entropy', 'Entropy', aiMetrics.entropy.toFixed(2),
+            'Shannon entropy of score distribution (0–3.32)',
+            '');
+        metricCard('ai-gini', 'Gini Coefficient', aiMetrics.giniCoefficient.toFixed(3),
+            'Score inequality (0=equal, 1=max inequality)',
+            '');
+
+        // Confidence Band
+        if (matchDetails) {
+            setStatCard('ai-band-lower', matchDetails.scorePercentiles.p10 + '%');
+            setStatCard('ai-band-mid',   matchDetails.scorePercentiles.p50 + '%');
+            setStatCard('ai-band-upper', matchDetails.scorePercentiles.p90 + '%');
+            renderConfidenceBandVisual(matchDetails.scorePercentiles);
+        }
+
+        // Geographic similarity
+        metricCard('ai-cosine', 'Cosine Similarity', aiMetrics.cosineSimilarity + '%',
+            'Geographic state-vector similarity between datasets',
+            getMetricClass(aiMetrics.cosineSimilarity, { excellent: 90, good: 75, fair: 50 }));
+
+        // Processing efficiency
+        setStatCard('ai-processing-eff', aiMetrics.processingEfficiency > 0
+            ? formatNumber(Math.round(aiMetrics.processingEfficiency)) + ' rec/s'
+            : 'N/A');
+
+        // Coverage rates
+        setStatCard('ai-coverage-a', aiMetrics.coverageRateA.toFixed(1) + '%');
+        setStatCard('ai-coverage-b', aiMetrics.coverageRateB.toFixed(1) + '%');
+
+        // Render AI charts
+        if (matchDetails) {
+            Visualizations.renderMatchTypeDonut(matchDetails);
+            Visualizations.renderComponentScoresBar(matchDetails);
+            Visualizations.renderConfidenceBandChart(matchDetails);
+        }
+        Visualizations.renderDQComparisonBar(aiMetrics);
+    }
+
+    function renderConfidenceBandVisual(percentiles) {
+        const el = document.getElementById('confidence-band-visual');
+        if (!el) return;
+        const { p10, p25, p50, p75, p90 } = percentiles;
+        el.innerHTML = `
+            <div class="confidence-band-track">
+                <div class="confidence-band-range" style="left:${p10}%;width:${p90 - p10}%"></div>
+                <div class="confidence-band-iqr" style="left:${p25}%;width:${p75 - p25}%"></div>
+                <div class="confidence-band-median" style="left:${p50}%"></div>
+            </div>
+            <div class="confidence-band-labels">
+                <span style="left:${p10}%">P10: ${p10}%</span>
+                <span style="left:${p25}%">P25: ${p25}%</span>
+                <span style="left:${p50}%">P50: ${p50}%</span>
+                <span style="left:${p75}%">P75: ${p75}%</span>
+                <span style="left:${p90}%">P90: ${p90}%</span>
+            </div>
+        `;
+    }
+
+    function renderDashboardAIInsights() {
+        if (!state.analysis || !state.analysis.aiMetrics) return;
+        const { aiMetrics } = state.analysis;
+
+        setStatCard('dash-ai-confidence', aiMetrics.overallConfidence + '%');
+        setStatCard('dash-ai-f1',         aiMetrics.f1Score + '%');
+        setStatCard('dash-ai-dq-a',       aiMetrics.dqScoreA.toFixed(1) + '%');
+        setStatCard('dash-ai-dq-b',       aiMetrics.dqScoreB.toFixed(1) + '%');
     }
 
     // ===== MATCHED TABLE =====
@@ -506,7 +671,7 @@ const App = (() => {
 
     function exportSummaryCsv() {
         if (!state.analysis) return;
-        const { summary, quality } = state.analysis;
+        const { summary, quality, matchDetails, aiMetrics } = state.analysis;
         const rows = [
             ['Metric', 'Value'],
             ['Total Records System A', summary.totalA],
@@ -526,13 +691,70 @@ const App = (() => {
             ['Incomplete Addresses', quality.a.incomplete],
             ['Invalid ZIP Codes', quality.a.invalidZip],
             ['Duplicate Addresses', quality.a.duplicates],
+            ['Avg Fields Populated', quality.a.avgFieldsPopulated],
+            ['Records w/ Secondary Unit (APT/STE)', quality.a.recordsWithSecondaryUnit],
+            ['ZIP+4 Count', quality.a.hasZipPlus4Count],
+            ['Standardized Street %', quality.a.standardizedStreetPct + '%'],
             [''],
             ['Address Quality - System B', ''],
             ['Complete Addresses', quality.b.complete],
             ['Incomplete Addresses', quality.b.incomplete],
             ['Invalid ZIP Codes', quality.b.invalidZip],
             ['Duplicate Addresses', quality.b.duplicates],
+            ['Avg Fields Populated', quality.b.avgFieldsPopulated],
+            ['Records w/ Secondary Unit (APT/STE)', quality.b.recordsWithSecondaryUnit],
+            ['ZIP+4 Count', quality.b.hasZipPlus4Count],
+            ['Standardized Street %', quality.b.standardizedStreetPct + '%'],
         ];
+        if (matchDetails) {
+            rows.push(['']);
+            rows.push(['Match Score Statistics', '']);
+            rows.push(['Average Match Score', matchDetails.avgMatchScore + '%']);
+            rows.push(['Median Match Score', matchDetails.medianMatchScore + '%']);
+            rows.push(['Std Dev Match Score', matchDetails.stdDevMatchScore]);
+            rows.push(['Min Match Score', matchDetails.minMatchScore + '%']);
+            rows.push(['Max Match Score', matchDetails.maxMatchScore + '%']);
+            rows.push(['P10 Score', matchDetails.scorePercentiles.p10 + '%']);
+            rows.push(['P25 Score', matchDetails.scorePercentiles.p25 + '%']);
+            rows.push(['P50 Score', matchDetails.scorePercentiles.p50 + '%']);
+            rows.push(['P75 Score', matchDetails.scorePercentiles.p75 + '%']);
+            rows.push(['P90 Score', matchDetails.scorePercentiles.p90 + '%']);
+            rows.push(['Avg Street Component Score', matchDetails.avgStreetScore + '%']);
+            rows.push(['Avg City Component Score', matchDetails.avgCityScore + '%']);
+            rows.push(['Avg State Component Score', matchDetails.avgStateScore + '%']);
+            rows.push(['Avg ZIP Component Score', matchDetails.avgZipScore + '%']);
+            rows.push(['Exact Matches', matchDetails.exactMatchCount]);
+            rows.push(['Fuzzy Matches', matchDetails.fuzzyMatchCount]);
+            rows.push(['Cross-State Matches', matchDetails.crossStateMatchCount]);
+            rows.push(['Cross-ZIP Matches', matchDetails.crossZipMatchCount]);
+            rows.push(['Cross-City Matches', matchDetails.crossCityMatchCount]);
+            rows.push(['Discrepancy Rate', matchDetails.discrepancyRate + '%']);
+            rows.push(['Avg Discrepancies/Match', matchDetails.avgDiscrepanciesPerMatch]);
+            rows.push(['Matched w/ Secondary Unit', matchDetails.matchedWithSecondaryUnit]);
+        }
+        if (aiMetrics) {
+            rows.push(['']);
+            rows.push(['AI / ML Metrics', '']);
+            rows.push(['Precision', aiMetrics.precision + '%']);
+            rows.push(['Recall', aiMetrics.recall + '%']);
+            rows.push(['F1 Score', aiMetrics.f1Score + '%']);
+            rows.push(['Accuracy', aiMetrics.accuracy + '%']);
+            rows.push(['Jaccard Index', aiMetrics.jaccardIndex + '%']);
+            rows.push(['DQ Score System A', aiMetrics.dqScoreA + '%']);
+            rows.push(['DQ Score System B', aiMetrics.dqScoreB + '%']);
+            rows.push(['Overall Confidence Index', aiMetrics.overallConfidence + '%']);
+            rows.push(['Shannon Entropy', aiMetrics.entropy]);
+            rows.push(['Gini Coefficient', aiMetrics.giniCoefficient]);
+            rows.push(['Coverage Rate A', aiMetrics.coverageRateA + '%']);
+            rows.push(['Coverage Rate B', aiMetrics.coverageRateB + '%']);
+            rows.push(['False Positive Risk', aiMetrics.falsePositiveRisk + '%']);
+            rows.push(['Anomaly Rate', aiMetrics.anomalyRate + '%']);
+            rows.push(['Cosine Similarity', aiMetrics.cosineSimilarity + '%']);
+            rows.push(['Processing Efficiency', aiMetrics.processingEfficiency + ' rec/s']);
+            rows.push(['Confidence Band Lower (P10)', aiMetrics.modelConfidenceBand.lower + '%']);
+            rows.push(['Confidence Band Mid (P50)', aiMetrics.modelConfidenceBand.mid + '%']);
+            rows.push(['Confidence Band Upper (P90)', aiMetrics.modelConfidenceBand.upper + '%']);
+        }
         downloadCsv(rows, 'analysis_summary.csv');
     }
 
@@ -868,6 +1090,92 @@ const App = (() => {
                 x: 0.6, y: 6.9, w: 12.1, h: 0.3,
                 fontSize: 10, color: MUTED, fontFace: 'Calibri'
             });
+
+            // ── Slide 12: AI Metrics Overview ──────────────────────────────────
+            const { aiMetrics, matchDetails } = state.analysis;
+            if (aiMetrics) {
+                const slideAI = pptx.addSlide();
+                addBg(slideAI);
+                addTitle(slideAI, '🤖 AI / ML Metrics Overview', 'Statistical model evaluation metrics derived from matching analysis');
+                const aiBoxes = [
+                    { label: 'Precision',           value: aiMetrics.precision + '%',         color: GREEN  },
+                    { label: 'Recall',              value: aiMetrics.recall + '%',             color: GREEN  },
+                    { label: 'F1 Score',            value: aiMetrics.f1Score + '%',            color: ACCENT },
+                    { label: 'Accuracy',            value: aiMetrics.accuracy + '%',           color: ACCENT },
+                    { label: 'Jaccard Index',       value: aiMetrics.jaccardIndex + '%',       color: PURPLE },
+                    { label: 'Confidence Index',    value: aiMetrics.overallConfidence + '%',  color: GREEN  }
+                ];
+                const aiBoxW = 1.9, aiBoxH = 1.1, aiGap = 0.15, aiStartX = 0.5, aiRow1Y = 1.4;
+                aiBoxes.forEach((b, i) => {
+                    statBox(slideAI, aiStartX + i * (aiBoxW + aiGap), aiRow1Y, aiBoxW, aiBoxH, b.label, b.value, b.color);
+                });
+                const aiRow2 = [
+                    { label: 'False Pos. Risk',     value: aiMetrics.falsePositiveRisk + '%',  color: AMBER },
+                    { label: 'Anomaly Rate',        value: aiMetrics.anomalyRate + '%',         color: AMBER },
+                    { label: 'Shannon Entropy',     value: aiMetrics.entropy.toFixed(2),        color: MUTED },
+                    { label: 'Gini Coeff.',         value: aiMetrics.giniCoefficient.toFixed(3),color: MUTED },
+                    { label: 'Geo Similarity',      value: aiMetrics.cosineSimilarity + '%',    color: ACCENT }
+                ];
+                const aiRow2Y = aiRow1Y + aiBoxH + 0.3;
+                aiRow2.forEach((b, i) => {
+                    statBox(slideAI, aiStartX + i * (aiBoxW + aiGap), aiRow2Y, aiBoxW, aiBoxH, b.label, b.value, b.color);
+                });
+                if (matchDetails) {
+                    const bandY = aiRow2Y + aiBoxH + 0.4;
+                    slideAI.addText(`Model Confidence Band — P10: ${matchDetails.scorePercentiles.p10}%  |  P50: ${matchDetails.scorePercentiles.p50}%  |  P90: ${matchDetails.scorePercentiles.p90}%`, {
+                        x: 0.5, y: bandY, w: 12, h: 0.4,
+                        fontSize: 12, color: TEXT, fontFace: 'Calibri', align: 'center'
+                    });
+                    const bandTrackW = 11;
+                    slideAI.addShape(pptx.ShapeType.rect, { x: 1.0, y: bandY + 0.5, w: bandTrackW, h: 0.2, fill: { color: '334155' }, rounding: 0.05 });
+                    const p10x = 1.0 + (matchDetails.scorePercentiles.p10 / 100) * bandTrackW;
+                    const p90x = 1.0 + (matchDetails.scorePercentiles.p90 / 100) * bandTrackW;
+                    const p50x = 1.0 + (matchDetails.scorePercentiles.p50 / 100) * bandTrackW;
+                    slideAI.addShape(pptx.ShapeType.rect, { x: p10x, y: bandY + 0.5, w: p90x - p10x, h: 0.2, fill: { color: ACCENT + '66' }, rounding: 0.05 });
+                    slideAI.addShape(pptx.ShapeType.rect, { x: p50x - 0.03, y: bandY + 0.45, w: 0.06, h: 0.3, fill: { color: GREEN } });
+                }
+                const aiChartUrl = Visualizations.getChartDataUrl('chart-ai-match-type');
+                if (aiChartUrl) {
+                    slideAI.addImage({ data: aiChartUrl, x: 9.5, y: 1.4, w: 3.3, h: 3.0 });
+                }
+            }
+
+            // ── Slide 13: Data Quality Scores ──────────────────────────────────
+            if (aiMetrics) {
+                const slideDQ = pptx.addSlide();
+                addBg(slideDQ);
+                addTitle(slideDQ, 'Data Quality Scores', 'Composite quality index per system — completeness, validity & deduplication');
+                statBox(slideDQ, 1.5,  1.4, 4, 1.5, 'System A — DQ Score', aiMetrics.dqScoreA.toFixed(1) + '%',
+                    aiMetrics.dqScoreA >= 90 ? GREEN : aiMetrics.dqScoreA >= 70 ? '84CC16' : aiMetrics.dqScoreA >= 55 ? AMBER : RED);
+                statBox(slideDQ, 7.83, 1.4, 4, 1.5, 'System B — DQ Score', aiMetrics.dqScoreB.toFixed(1) + '%',
+                    aiMetrics.dqScoreB >= 90 ? GREEN : aiMetrics.dqScoreB >= 70 ? '84CC16' : aiMetrics.dqScoreB >= 55 ? AMBER : RED);
+                const dqQRows = [
+                    ['Metric', 'System A', 'System B'],
+                    ['Complete %', quality.a.completePct + '%', quality.b.completePct + '%'],
+                    ['Invalid ZIP %', quality.a.invalidZipPct + '%', quality.b.invalidZipPct + '%'],
+                    ['Invalid State %', quality.a.invalidStatePct + '%', quality.b.invalidStatePct + '%'],
+                    ['Duplicate %', quality.a.duplicatePct + '%', quality.b.duplicatePct + '%'],
+                    ['Avg Fields', quality.a.avgFieldsPopulated.toFixed(2), quality.b.avgFieldsPopulated.toFixed(2)],
+                    ['Secondary Units', formatNumber(quality.a.recordsWithSecondaryUnit), formatNumber(quality.b.recordsWithSecondaryUnit)],
+                    ['ZIP+4 Count', formatNumber(quality.a.hasZipPlus4Count), formatNumber(quality.b.hasZipPlus4Count)],
+                    ['Standardized St%', quality.a.standardizedStreetPct + '%', quality.b.standardizedStreetPct + '%'],
+                ];
+                const dqTbl = [
+                    dqQRows[0].map((t, i) => ({ text: t, options: { bold: true, color: TEXT, fill: { color: i === 0 ? SURFACE : ACCENT } } })),
+                    ...dqQRows.slice(1).map(r => r.map((c, i) => ({ text: c, options: { color: i === 0 ? MUTED : TEXT } })))
+                ];
+                slideDQ.addTable(dqTbl, {
+                    x: 1.5, y: 3.2, w: 10.3, h: 3.8,
+                    fontSize: 11, fontFace: 'Calibri',
+                    rowH: 0.38,
+                    border: { color: '334155', pt: 0.5 },
+                    fill: { color: SURFACE }
+                });
+                const dqUrl = Visualizations.getChartDataUrl('chart-ai-dq-comparison');
+                if (dqUrl) {
+                    slideDQ.addImage({ data: dqUrl, x: 1.5, y: 7.0, w: 4.0, h: 0.5 });
+                }
+            }
 
             // ── Save ─────────────────────────────────────────────────────────
             hideLoading();

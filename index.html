@@ -175,6 +175,7 @@
     <button class="nav-tab" data-tab="match-summary" role="tab">✅ Match Summary</button>
     <button class="nav-tab" data-tab="geographic" role="tab">🗺 Geographic</button>
     <button class="nav-tab" data-tab="quality" role="tab">🔍 Address Quality</button>
+    <button class="nav-tab" data-tab="ai-metrics" role="tab">🤖 AI Metrics</button>
     <button class="nav-tab" data-tab="results" role="tab">📋 Detailed Results</button>
     <button class="nav-tab" data-tab="export" role="tab">💾 Export</button>
 </nav>
@@ -228,6 +229,29 @@
             <div class="stat-card none">
                 <div class="stat-value text-danger" id="stat-unmatched-b">—</div>
                 <div class="stat-label">Unmatched (B)</div>
+            </div>
+        </div>
+
+        <!-- AI Insights Quick-Glance Row -->
+        <div class="card ai-insights-row">
+            <div class="card-title">🤖 AI Insights</div>
+            <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+                <div class="stat-card neutral">
+                    <div class="stat-value text-accent" id="dash-ai-confidence">—</div>
+                    <div class="stat-label">Confidence Index</div>
+                </div>
+                <div class="stat-card neutral">
+                    <div class="stat-value text-success" id="dash-ai-f1">—</div>
+                    <div class="stat-label">F1 Score</div>
+                </div>
+                <div class="stat-card system-a">
+                    <div class="stat-value text-accent" id="dash-ai-dq-a">—</div>
+                    <div class="stat-label">DQ Score — System A</div>
+                </div>
+                <div class="stat-card system-b">
+                    <div class="stat-value" style="color:var(--color-system-b)" id="dash-ai-dq-b">—</div>
+                    <div class="stat-label">DQ Score — System B</div>
+                </div>
             </div>
         </div>
 
@@ -476,6 +500,142 @@
                 </div>
                 <div class="card-title mt-3" style="font-size:0.875rem">Field Completeness</div>
                 <div id="quality-fields-b" class="field-completeness"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ TAB: AI METRICS ═══════════════ -->
+    <section id="tab-ai-metrics" class="tab-content fade-in">
+        <div class="section-header">
+            <div>
+                <div class="section-title">🤖 AI / ML Metrics</div>
+                <div class="section-subtitle">Statistical model-evaluation indicators derived from your address matching analysis</div>
+            </div>
+        </div>
+
+        <!-- 1. AI Performance Overview -->
+        <div class="card mb-4">
+            <div class="card-title">AI Performance Overview</div>
+            <div class="ai-metrics-grid">
+                <div id="ai-precision"  class="metric-card"><div class="metric-value">—</div><div class="metric-label">Precision</div></div>
+                <div id="ai-recall"     class="metric-card"><div class="metric-value">—</div><div class="metric-label">Recall</div></div>
+                <div id="ai-f1"         class="metric-card"><div class="metric-value">—</div><div class="metric-label">F1 Score</div></div>
+                <div id="ai-accuracy"   class="metric-card"><div class="metric-value">—</div><div class="metric-label">Accuracy</div></div>
+                <div id="ai-confidence" class="metric-card"><div class="metric-value">—</div><div class="metric-label">Confidence Index</div></div>
+                <div id="ai-jaccard"    class="metric-card"><div class="metric-value">—</div><div class="metric-label">Jaccard Index</div></div>
+            </div>
+        </div>
+
+        <!-- 2. Data Quality Scores -->
+        <div class="card mb-4">
+            <div class="card-title">Data Quality Scores</div>
+            <div class="ai-metrics-grid" style="grid-template-columns:1fr 1fr">
+                <div id="ai-dq-a" class="metric-card"><div class="metric-value">—</div><div class="metric-label">DQ Score — System A</div></div>
+                <div id="ai-dq-b" class="metric-card"><div class="metric-value">—</div><div class="metric-label">DQ Score — System B</div></div>
+            </div>
+            <div class="chart-container mt-3" style="height:180px">
+                <canvas id="chart-ai-dq-comparison"></canvas>
+            </div>
+        </div>
+
+        <!-- 3. Match Score Statistics -->
+        <div class="card mb-4">
+            <div class="card-title">Match Score Statistics</div>
+            <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
+                <div class="stat-card neutral"><div class="stat-value text-accent" id="ai-avg-score">—</div><div class="stat-label">Avg Score</div></div>
+                <div class="stat-card neutral"><div class="stat-value text-accent" id="ai-median-score">—</div><div class="stat-label">Median Score</div></div>
+                <div class="stat-card neutral"><div class="stat-value" id="ai-stddev-score">—</div><div class="stat-label">Std Dev</div></div>
+                <div class="stat-card none">   <div class="stat-value text-danger" id="ai-min-score">—</div><div class="stat-label">Min Score</div></div>
+                <div class="stat-card perfect"><div class="stat-value text-success" id="ai-max-score">—</div><div class="stat-label">Max Score</div></div>
+            </div>
+            <div class="card-title mt-3" style="font-size:0.875rem">Score Percentiles</div>
+            <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
+                <div class="stat-card none">   <div class="stat-value" id="ai-p10">—</div><div class="stat-label">P10</div></div>
+                <div class="stat-card partial"> <div class="stat-value" id="ai-p25">—</div><div class="stat-label">P25</div></div>
+                <div class="stat-card neutral"> <div class="stat-value text-accent" id="ai-p50">—</div><div class="stat-label">P50 (Median)</div></div>
+                <div class="stat-card high">    <div class="stat-value" id="ai-p75">—</div><div class="stat-label">P75</div></div>
+                <div class="stat-card perfect"> <div class="stat-value text-success" id="ai-p90">—</div><div class="stat-label">P90</div></div>
+            </div>
+        </div>
+
+        <!-- 4. Per-Component Score Breakdown -->
+        <div class="card mb-4">
+            <div class="card-title">Per-Component Score Breakdown</div>
+            <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+                <div class="stat-card neutral"><div class="stat-value text-accent" id="ai-street-score">—</div><div class="stat-label">Avg Street Score</div></div>
+                <div class="stat-card neutral"><div class="stat-value text-accent" id="ai-city-score">—</div><div class="stat-label">Avg City Score</div></div>
+                <div class="stat-card neutral"><div class="stat-value text-accent" id="ai-state-score">—</div><div class="stat-label">Avg State Score</div></div>
+                <div class="stat-card neutral"><div class="stat-value text-accent" id="ai-zip-score">—</div><div class="stat-label">Avg ZIP Score</div></div>
+            </div>
+            <div class="chart-container mt-3" style="height:200px">
+                <canvas id="chart-ai-component-scores"></canvas>
+            </div>
+        </div>
+
+        <!-- 5. Risk & Anomaly Indicators -->
+        <div class="card mb-4">
+            <div class="card-title">Risk &amp; Anomaly Indicators</div>
+            <div class="ai-metrics-grid" style="grid-template-columns:repeat(4,1fr)">
+                <div id="ai-fp-risk"  class="metric-card"><div class="metric-value">—</div><div class="metric-label">False Positive Risk</div></div>
+                <div id="ai-anomaly" class="metric-card"><div class="metric-value">—</div><div class="metric-label">Anomaly Rate</div></div>
+                <div id="ai-entropy" class="metric-card"><div class="metric-value">—</div><div class="metric-label">Entropy</div></div>
+                <div id="ai-gini"    class="metric-card"><div class="metric-value">—</div><div class="metric-label">Gini Coefficient</div></div>
+            </div>
+        </div>
+
+        <!-- 6. Match Type Breakdown -->
+        <div class="card mb-4">
+            <div class="card-title">Match Type Breakdown</div>
+            <div class="stats-grid" style="grid-template-columns:1fr 1fr 2fr">
+                <div class="stat-card perfect"><div class="stat-value text-success" id="ai-exact-count">—</div><div class="stat-label">Exact Matches</div></div>
+                <div class="stat-card partial"> <div class="stat-value" style="color:var(--color-partial)" id="ai-fuzzy-count">—</div><div class="stat-label">Fuzzy Matches</div></div>
+                <div class="chart-container" style="height:200px">
+                    <canvas id="chart-ai-match-type"></canvas>
+                </div>
+            </div>
+            <div class="stats-grid mt-3" style="grid-template-columns:repeat(3,1fr)">
+                <div class="stat-card none"><div class="stat-value text-danger" id="ai-cross-state">—</div><div class="stat-label">Cross-State Matches</div></div>
+                <div class="stat-card none"><div class="stat-value text-danger" id="ai-cross-zip">—</div><div class="stat-label">Cross-ZIP Matches</div></div>
+                <div class="stat-card none"><div class="stat-value text-warning" id="ai-cross-city">—</div><div class="stat-label">Cross-City Matches</div></div>
+            </div>
+            <div class="stats-grid mt-2" style="grid-template-columns:repeat(3,1fr)">
+                <div class="stat-card neutral"><div class="stat-value" id="ai-disc-rate">—</div><div class="stat-label">Discrepancy Rate</div></div>
+                <div class="stat-card neutral"><div class="stat-value" id="ai-avg-disc">—</div><div class="stat-label">Avg Discrepancies/Match</div></div>
+                <div class="stat-card neutral"><div class="stat-value" id="ai-secondary-unit">—</div><div class="stat-label">Matched w/ Secondary Unit</div></div>
+            </div>
+        </div>
+
+        <!-- 7. Model Confidence Band -->
+        <div class="card mb-4">
+            <div class="card-title">Model Confidence Band</div>
+            <div class="stats-grid mb-3" style="grid-template-columns:repeat(3,1fr)">
+                <div class="stat-card none">   <div class="stat-value text-danger" id="ai-band-lower">—</div><div class="stat-label">Lower (P10)</div></div>
+                <div class="stat-card neutral"> <div class="stat-value text-accent" id="ai-band-mid">—</div><div class="stat-label">Mid (P50)</div></div>
+                <div class="stat-card perfect"> <div class="stat-value text-success" id="ai-band-upper">—</div><div class="stat-label">Upper (P90)</div></div>
+            </div>
+            <div id="confidence-band-visual" class="confidence-band-container">
+                <div class="confidence-band-track"><div class="confidence-band-range"></div></div>
+            </div>
+            <div class="chart-container mt-3" style="height:200px">
+                <canvas id="chart-ai-confidence-band"></canvas>
+            </div>
+        </div>
+
+        <!-- 8. Geographic Similarity & Coverage -->
+        <div class="card mb-4">
+            <div class="card-title">Geographic Similarity &amp; Coverage</div>
+            <div class="ai-metrics-grid" style="grid-template-columns:repeat(3,1fr)">
+                <div id="ai-cosine" class="metric-card"><div class="metric-value">—</div><div class="metric-label">Cosine Similarity</div></div>
+                <div class="metric-card neutral"><div class="metric-value" id="ai-coverage-a">—</div><div class="metric-label">Coverage Rate A</div><div class="metric-explain">Should be ~100% (sanity check)</div></div>
+                <div class="metric-card neutral"><div class="metric-value" id="ai-coverage-b">—</div><div class="metric-label">Coverage Rate B</div><div class="metric-explain">Should be ~100% (sanity check)</div></div>
+            </div>
+        </div>
+
+        <!-- 9. Processing Performance -->
+        <div class="card">
+            <div class="card-title">Processing Performance</div>
+            <div class="ai-metrics-grid" style="grid-template-columns:1fr">
+                <div class="metric-card neutral"><div class="metric-value" id="ai-processing-eff">—</div><div class="metric-label">Processing Efficiency</div><div class="metric-explain">Records matched per second</div></div>
             </div>
         </div>
     </section>
