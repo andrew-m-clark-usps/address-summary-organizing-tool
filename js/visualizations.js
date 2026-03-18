@@ -524,6 +524,177 @@ const Visualizations = (() => {
         renderTopCitiesChart(cities);
         renderDiscrepancyChart(summary.discrepancyTypes);
         renderVolumeComparisonChart(summary);
+        // AI charts rendered separately via renderAIMetrics() in app.js
+    }
+
+    /**
+     * AI Chart: Match Type Donut (exact vs fuzzy)
+     */
+    function renderMatchTypeDonut(matchDetails) {
+        const ctx = getCtx('chart-ai-match-type');
+        if (!ctx) return;
+        chartInstances['chart-ai-match-type'] = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Exact Matches', 'Fuzzy Matches'],
+                datasets: [{
+                    data: [matchDetails.exactMatchCount, matchDetails.fuzzyMatchCount],
+                    backgroundColor: [COLORS.perfect, COLORS.partial],
+                    borderColor: '#FFFFFF',
+                    borderWidth: 2,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: defaultTickColor, padding: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                                return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '55%'
+            }
+        });
+    }
+
+    /**
+     * AI Chart: Component Scores Horizontal Bar
+     */
+    function renderComponentScoresBar(matchDetails) {
+        const ctx = getCtx('chart-ai-component-scores');
+        if (!ctx) return;
+        chartInstances['chart-ai-component-scores'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Street', 'City', 'State', 'ZIP'],
+                datasets: [{
+                    label: 'Avg Component Score',
+                    data: [
+                        matchDetails.avgStreetScore,
+                        matchDetails.avgCityScore,
+                        matchDetails.avgStateScore,
+                        matchDetails.avgZipScore
+                    ],
+                    backgroundColor: [
+                        ALPHA(COLORS.systemA, 0.7),
+                        ALPHA(COLORS.perfect,  0.7),
+                        ALPHA(COLORS.high,     0.7),
+                        ALPHA(COLORS.partial,  0.7)
+                    ],
+                    borderColor: [COLORS.systemA, COLORS.perfect, COLORS.high, COLORS.partial],
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` Score: ${ctx.parsed.x}%` } }
+                },
+                scales: {
+                    x: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' }
+                    },
+                    y: { grid: { display: false }, ticks: { color: defaultTickColor } }
+                }
+            }
+        });
+    }
+
+    /**
+     * AI Chart: Confidence Band (percentile range)
+     */
+    function renderConfidenceBandChart(matchDetails) {
+        const ctx = getCtx('chart-ai-confidence-band');
+        if (!ctx) return;
+        const p = matchDetails.scorePercentiles;
+        chartInstances['chart-ai-confidence-band'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['P10', 'P25', 'P50 (Median)', 'P75', 'P90'],
+                datasets: [{
+                    label: 'Percentile Score',
+                    data: [p.p10, p.p25, p.p50, p.p75, p.p90],
+                    backgroundColor: [
+                        ALPHA(COLORS.none,    0.6),
+                        ALPHA(COLORS.partial, 0.6),
+                        ALPHA(COLORS.perfect, 0.8),
+                        ALPHA(COLORS.partial, 0.6),
+                        ALPHA(COLORS.none,    0.6)
+                    ],
+                    borderColor: [COLORS.none, COLORS.partial, COLORS.perfect, COLORS.partial, COLORS.none],
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.y}%` } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: defaultTickColor } },
+                    y: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * AI Chart: DQ Score Comparison Bar
+     */
+    function renderDQComparisonBar(aiMetrics) {
+        const ctx = getCtx('chart-ai-dq-comparison');
+        if (!ctx) return;
+        chartInstances['chart-ai-dq-comparison'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['System A', 'System B'],
+                datasets: [{
+                    label: 'Data Quality Score',
+                    data: [aiMetrics.dqScoreA, aiMetrics.dqScoreB],
+                    backgroundColor: [ALPHA(COLORS.systemA, 0.7), ALPHA(COLORS.systemB, 0.7)],
+                    borderColor: [COLORS.systemA, COLORS.systemB],
+                    borderWidth: 2,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` DQ Score: ${ctx.parsed.y}%` } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: defaultTickColor } },
+                    y: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' }
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -558,6 +729,10 @@ const Visualizations = (() => {
         renderTopCitiesChart,
         renderDiscrepancyChart,
         renderVolumeComparisonChart,
+        renderMatchTypeDonut,
+        renderComponentScoresBar,
+        renderConfidenceBandChart,
+        renderDQComparisonBar,
         exportChartPng,
         getChartDataUrl,
         chartInstances,

@@ -275,7 +275,12 @@ const AddressMatcher = (() => {
                         recordB: dataB[bIdx],
                         score: 100,
                         label: 'perfect',
-                        discrepancies
+                        discrepancies,
+                        zipScore: 100,
+                        stateScore: 100,
+                        cityScore: 100,
+                        streetScore: 100,
+                        matchType: 'exact'
                     });
                     continue;
                 }
@@ -287,6 +292,7 @@ const AddressMatcher = (() => {
 
             let bestScore = 0;
             let bestBIdx = -1;
+            let bestResult = null;
 
             for (const bIdx of candidates) {
                 if (matchedBIndices.has(bIdx)) continue;
@@ -294,6 +300,7 @@ const AddressMatcher = (() => {
                 if (result.score > bestScore) {
                     bestScore = result.score;
                     bestBIdx = bIdx;
+                    bestResult = result;
                 }
                 // Short circuit on perfect score
                 if (bestScore === 100) break;
@@ -312,6 +319,7 @@ const AddressMatcher = (() => {
                         if (result.score > bestScore) {
                             bestScore = result.score;
                             bestBIdx = bIdx;
+                            bestResult = result;
                         }
                         checked++;
                     }
@@ -326,7 +334,12 @@ const AddressMatcher = (() => {
                     recordB: dataB[bestBIdx],
                     score: bestScore,
                     label: getConfidenceLabel(bestScore),
-                    discrepancies
+                    discrepancies,
+                    zipScore: bestResult ? bestResult.zipScore : 0,
+                    stateScore: bestResult ? bestResult.stateScore : 0,
+                    cityScore: bestResult ? bestResult.cityScore : 0,
+                    streetScore: bestResult ? bestResult.streetScore : 0,
+                    matchType: 'fuzzy'
                 });
             } else {
                 unmatchedA.push(recA);
