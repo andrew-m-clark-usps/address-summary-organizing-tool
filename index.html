@@ -10,6 +10,58 @@
 </head>
 <body>
 
+<!-- Landing Page -->
+<section id="landing-page">
+    <div class="landing-inner">
+        <div class="landing-header">
+            <h1>📊 Address Summary Organizing Tool</h1>
+            <p>Upload two address datasets to compare — from CSV or Excel exports. The tool will match records, score confidence, and generate a full analysis breakdown.</p>
+            <div class="landing-samples">
+                <a href="samples/sample_system_a.csv" download class="btn btn-secondary btn-sm">⬇ Sample A</a>
+                <a href="samples/sample_system_b.csv" download class="btn btn-secondary btn-sm">⬇ Sample B</a>
+            </div>
+        </div>
+
+        <div class="landing-upload-grid">
+            <!-- System A -->
+            <div class="landing-upload-card">
+                <div class="card-title">
+                    <span style="color:var(--color-system-a)">■</span> System A
+                </div>
+                <div id="landing-zone-a" class="upload-zone">
+                    <input type="file" id="landing-file-a" accept=".csv,.xlsx,.xls">
+                    <span class="upload-icon">📂</span>
+                    <h3>Drop file or click to browse</h3>
+                    <p>CSV or Excel (.xlsx/.xls)</p>
+                    <div class="btn btn-primary btn-sm" style="pointer-events:none">Choose File</div>
+                </div>
+                <div id="landing-alert-a" class="mt-2"></div>
+            </div>
+
+            <!-- System B -->
+            <div class="landing-upload-card">
+                <div class="card-title">
+                    <span style="color:var(--color-system-b)">■</span> System B
+                </div>
+                <div id="landing-zone-b" class="upload-zone">
+                    <input type="file" id="landing-file-b" accept=".csv,.xlsx,.xls">
+                    <span class="upload-icon">📂</span>
+                    <h3>Drop file or click to browse</h3>
+                    <p>CSV or Excel (.xlsx/.xls)</p>
+                    <div class="btn btn-primary btn-sm" style="pointer-events:none">Choose File</div>
+                </div>
+                <div id="landing-alert-b" class="mt-2"></div>
+            </div>
+        </div>
+
+        <div class="landing-action">
+            <button id="btn-landing-start" class="btn btn-primary btn-lg" disabled>
+                🔍 Run Analysis
+            </button>
+        </div>
+    </div>
+</section>
+
 <!-- Loading Overlay -->
 <div id="loading-overlay" class="loading-overlay">
     <div class="loading-spinner"></div>
@@ -546,7 +598,7 @@
         <div id="export-alert" class="mb-3"></div>
 
         <!-- PowerPoint Export (featured) -->
-        <div class="card mb-4" style="border-color:var(--accent);background:rgba(59,130,246,0.05)">
+        <div class="card mb-4" style="border-color:var(--accent);background:rgba(46,107,138,0.04)">
             <div class="card-title" style="color:var(--accent)">📑 PowerPoint Presentation Export</div>
             <p class="text-sm text-secondary mb-3">
                 Generate a complete, professional PowerPoint (.pptx) presentation with all analysis breakdowns,

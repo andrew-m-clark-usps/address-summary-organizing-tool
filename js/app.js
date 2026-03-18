@@ -555,15 +555,15 @@ const App = (() => {
             pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
 
             // Color theme
-            const ACCENT  = '3B82F6';
-            const DARK    = '0F172A';
-            const SURFACE = '1E293B';
-            const TEXT    = 'F1F5F9';
-            const MUTED   = '94A3B8';
-            const GREEN   = '10B981';
-            const AMBER   = 'F59E0B';
-            const RED     = 'EF4444';
-            const PURPLE  = '8B5CF6';
+            const ACCENT  = '2E6B8A';
+            const DARK    = 'FAFAF8';
+            const SURFACE = 'F5F3EF';
+            const TEXT    = '2D2D2D';
+            const MUTED   = '6B6B6B';
+            const GREEN   = '4A8C6F';
+            const AMBER   = 'C4873B';
+            const RED     = 'C0564B';
+            const PURPLE  = '8B6B8A';
 
             const { summary, quality, geo, cities } = state.analysis;
             const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -597,7 +597,7 @@ const App = (() => {
 
             function statBox(slide, x, y, w, h, label, value, barColor) {
                 slide.addShape(pptx.ShapeType.rect, {
-                    x, y, w, h, fill: { color: SURFACE }, line: { color: '334155', width: 0.5 }, rounding: 0.1
+                    x, y, w, h, fill: { color: 'FFFFFF' }, line: { color: 'E8E5E0', width: 0.5 }, rounding: 0.1
                 });
                 slide.addText(String(value), {
                     x: x + 0.1, y: y + 0.1, w: w - 0.2, h: h * 0.55,
@@ -617,7 +617,7 @@ const App = (() => {
             // ── Slide 1: Title ────────────────────────────────────────────────
             const slideTitle = pptx.addSlide();
             addBg(slideTitle, DARK);
-            // Large gradient-ish background block
+            // Large background blocks
             slideTitle.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 7.5, fill: { color: DARK } });
             slideTitle.addShape(pptx.ShapeType.rect, { x: 0, y: 5.5, w: 13.33, h: 2.0, fill: { color: SURFACE } });
             slideTitle.addText('📊 Address Summary Organizing Tool', {
@@ -663,9 +663,9 @@ const App = (() => {
             const row2Y = row1Y + boxH + 0.3;
             const boxes2 = [
                 { label: 'Perfect (100%)',   value: formatNumber(summary.perfect), color: GREEN },
-                { label: 'High (90-99%)',    value: formatNumber(summary.high),    color: '84CC16' },
+                { label: 'High (90-99%)',    value: formatNumber(summary.high),    color: '6BA86A' },
                 { label: 'Partial (70-89%)', value: formatNumber(summary.partial), color: AMBER },
-                { label: 'Low (50-69%)',     value: formatNumber(summary.low),     color: 'F97316' },
+                { label: 'Low (50-69%)',     value: formatNumber(summary.low),     color: 'B8703A' },
                 { label: 'No Match (<50%)',  value: formatNumber(summary.veryLow), color: RED },
             ];
             boxes2.forEach((b, i) => {
@@ -679,7 +679,7 @@ const App = (() => {
                 fontSize: 13, color: TEXT, fontFace: 'Calibri', bold: true
             });
             const barW = 12.33;
-            slideStats.addShape(pptx.ShapeType.rect, { x: 0.5, y: barY + 0.4, w: barW, h: 0.25, fill: { color: '334155' }, rounding: 0.05 });
+            slideStats.addShape(pptx.ShapeType.rect, { x: 0.5, y: barY + 0.4, w: barW, h: 0.25, fill: { color: 'E8E5E0' }, rounding: 0.05 });
             slideStats.addShape(pptx.ShapeType.rect, { x: 0.5, y: barY + 0.4, w: barW * (summary.matchPct / 100), h: 0.25, fill: { color: GREEN }, rounding: 0.05 });
 
             // ── Slide 3: Match Distribution Chart ────────────────────────────
@@ -694,9 +694,9 @@ const App = (() => {
             // Legend / text breakdown
             const distItems = [
                 { label: 'Perfect Match (100%)',    value: summary.perfect,  pct: pct(summary.perfect, summary.matched),  color: GREEN },
-                { label: 'High Confidence (90-99%)',value: summary.high,     pct: pct(summary.high, summary.matched),     color: '84CC16' },
+                { label: 'High Confidence (90-99%)',value: summary.high,     pct: pct(summary.high, summary.matched),     color: '6BA86A' },
                 { label: 'Partial Match (70-89%)',  value: summary.partial,  pct: pct(summary.partial, summary.matched),  color: AMBER },
-                { label: 'Low Confidence (50-69%)', value: summary.low,      pct: pct(summary.low, summary.matched),      color: 'F97316' },
+                { label: 'Low Confidence (50-69%)', value: summary.low,      pct: pct(summary.low, summary.matched),      color: 'B8703A' },
                 { label: 'No Match (<50%)',          value: summary.veryLow, pct: pct(summary.veryLow, summary.matched),  color: RED },
             ];
             distItems.forEach((item, i) => {
@@ -742,15 +742,15 @@ const App = (() => {
                 ],
                 ...topCities.map(c => [
                     { text: c.city, options: { color: TEXT } },
-                    { text: formatNumber(c.countA), options: { color: '93C5FD', align: 'center' } },
-                    { text: formatNumber(c.countB), options: { color: 'C4B5FD', align: 'center' } }
+                    { text: formatNumber(c.countA), options: { color: '4A7C9B', align: 'center' } },
+                    { text: formatNumber(c.countB), options: { color: '8B6B8A', align: 'center' } }
                 ])
             ];
             slideCities.addTable(tblData, {
                 x: 7, y: 1.4, w: 6.0, h: 5.4,
                 fontSize: 11, fontFace: 'Calibri',
                 rowH: 0.42,
-                border: { color: '334155', pt: 0.5 },
+                border: { color: 'E8E5E0', pt: 0.5 },
                 fill: { color: SURFACE }
             });
 
@@ -785,7 +785,7 @@ const App = (() => {
                 x: 6.5, y: 1.4, w: 6.5, h: 5.8,
                 fontSize: 11, fontFace: 'Calibri',
                 rowH: 0.44,
-                border: { color: '334155', pt: 0.5 },
+                border: { color: 'E8E5E0', pt: 0.5 },
                 fill: { color: SURFACE }
             });
 
@@ -826,7 +826,7 @@ const App = (() => {
                 x: 6.5, y: 1.4, w: 6.5, h: 3.5,
                 fontSize: 11, fontFace: 'Calibri',
                 rowH: 0.44,
-                border: { color: '334155', pt: 0.5 },
+                border: { color: 'E8E5E0', pt: 0.5 },
                 fill: { color: SURFACE }
             });
 
@@ -876,6 +876,105 @@ const App = (() => {
 
     // ===== INIT =====
     function init() {
+        // Show landing page; hide main app header/nav/content
+        const landingPage  = document.getElementById('landing-page');
+        const appHeader    = document.querySelector('.app-header');
+        const appNav       = document.querySelector('.nav-tabs');
+        const appContent   = document.querySelector('.main-content');
+
+        function showLanding() {
+            if (landingPage)  landingPage.style.display  = '';
+            if (appHeader)    appHeader.style.display    = 'none';
+            if (appNav)       appNav.style.display       = 'none';
+            if (appContent)   appContent.style.display   = 'none';
+        }
+
+        function showMainApp() {
+            if (landingPage)  landingPage.style.display  = 'none';
+            if (appHeader)    appHeader.style.display    = '';
+            if (appNav)       appNav.style.display       = '';
+            if (appContent)   appContent.style.display   = '';
+        }
+
+        showLanding();
+
+        // Landing page file upload handlers
+        const landingFileA = document.getElementById('landing-file-a');
+        const landingFileB = document.getElementById('landing-file-b');
+        const landingZoneA = document.getElementById('landing-zone-a');
+        const landingZoneB = document.getElementById('landing-zone-b');
+        const landingAlertA = document.getElementById('landing-alert-a');
+        const landingAlertB = document.getElementById('landing-alert-b');
+        const landingBtn    = document.getElementById('btn-landing-start');
+
+        function updateLandingButton() {
+            if (landingBtn) landingBtn.disabled = !(state.dataA && state.dataB);
+        }
+
+        function handleLandingUpload(fileInput, system) {
+            const file = fileInput.files[0];
+            if (!file) return;
+            const alertEl = system === 'a' ? landingAlertA : landingAlertB;
+            const zoneEl  = system === 'a' ? landingZoneA  : landingZoneB;
+            // Mirror to main upload zone so the full app state is consistent
+            const mainInfoId  = system === 'a' ? 'file-info-a'    : 'file-info-b';
+            const mainZoneId  = system === 'a' ? 'upload-zone-a'  : 'upload-zone-b';
+            const mainAlertId = system === 'a' ? 'upload-alert-a' : 'upload-alert-b';
+            clearAlert(mainAlertId);
+            showLoading(`Loading ${system === 'a' ? 'System A' : 'System B'} file…`, file.name);
+            loadFile(file)
+                .then(result => {
+                    if (system === 'a') state.dataA = result;
+                    else state.dataB = result;
+                    hideLoading();
+                    if (zoneEl)  zoneEl.classList.add('loaded');
+                    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success"><span>✅</span><span>Loaded ${formatNumber(result.records.length)} records from "${file.name}"</span></div>`;
+                    // Also update main upload tab info
+                    const mainInfo = document.getElementById(mainInfoId);
+                    const mainZone = document.getElementById(mainZoneId);
+                    if (mainInfo) { mainInfo.textContent = `✅ Loaded: ${formatNumber(result.records.length)} records from "${file.name}"`; mainInfo.classList.add('visible'); }
+                    if (mainZone) mainZone.classList.add('loaded');
+                    showAlert(mainAlertId, 'success', `Successfully loaded ${formatNumber(result.records.length)} records.`);
+                    updateLandingButton();
+                    updateAnalyzeButton();
+                })
+                .catch(err => {
+                    hideLoading();
+                    if (alertEl) alertEl.innerHTML = `<div class="alert alert-danger"><span>❌</span><span>${err.message}</span></div>`;
+                });
+        }
+
+        if (landingFileA) landingFileA.addEventListener('change', (e) => handleLandingUpload(e.target, 'a'));
+        if (landingFileB) landingFileB.addEventListener('change', (e) => handleLandingUpload(e.target, 'b'));
+
+        // Landing drag-and-drop
+        [['landing-zone-a', 'landing-file-a', 'a'], ['landing-zone-b', 'landing-file-b', 'b']].forEach(([zoneId, inputId, sys]) => {
+            const zone  = document.getElementById(zoneId);
+            const input = document.getElementById(inputId);
+            if (!zone || !input) return;
+            zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    input.files = dt.files;
+                    handleLandingUpload(input, sys);
+                }
+            });
+        });
+
+        // Landing "Run Analysis" button
+        if (landingBtn) {
+            landingBtn.addEventListener('click', async () => {
+                showMainApp();
+                await runAnalysis();
+            });
+        }
+
         // Tab navigation
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', () => {
@@ -884,7 +983,7 @@ const App = (() => {
             });
         });
 
-        // File upload
+        // File upload (main app upload tab)
         document.getElementById('file-input-a').addEventListener('change', (e) => handleFileUpload(e.target, 'a'));
         document.getElementById('file-input-b').addEventListener('change', (e) => handleFileUpload(e.target, 'b'));
 
