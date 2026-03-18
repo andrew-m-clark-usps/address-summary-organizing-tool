@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Address Summary Organizing Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div>
+        <div class="loading-text">Processing…</div>
+        <div class="loading-sub"></div>
+    </div>
+</div>
+
+<!-- Header -->
+<header class="app-header">
+    <div>
+        <h1>📊 Address Summary Organizing Tool</h1>
+        <div class="header-subtitle">Dual-system address matching &amp; analysis with comprehensive visualizations</div>
+    </div>
+    <div class="flex gap-3 items-center">
+        <button id="export-pptx-btn" class="btn btn-secondary btn-sm" disabled title="Export analysis to PowerPoint">
+            📑 Export PowerPoint
+        </button>
+        <a href="samples/sample_system_a.csv" download class="btn btn-secondary btn-sm">⬇ Sample A</a>
+        <a href="samples/sample_system_b.csv" download class="btn btn-secondary btn-sm">⬇ Sample B</a>
+    </div>
+</header>
+
+<!-- Navigation -->
+<nav class="nav-tabs" role="tablist">
+    <button class="nav-tab active" data-tab="upload" role="tab">📁 Upload &amp; Configure</button>
+    <button class="nav-tab" data-tab="dashboard" data-requires-analysis="1" role="tab">📊 Dashboard</button>
+    <button class="nav-tab" data-tab="match-summary" data-requires-analysis="1" role="tab">✅ Match Summary</button>
+    <button class="nav-tab" data-tab="geographic" data-requires-analysis="1" role="tab">🗺 Geographic</button>
+    <button class="nav-tab" data-tab="quality" data-requires-analysis="1" role="tab">🔍 Address Quality</button>
+    <button class="nav-tab" data-tab="results" data-requires-analysis="1" role="tab">📋 Detailed Results</button>
+    <button class="nav-tab" data-tab="export" data-requires-analysis="1" role="tab">💾 Export</button>
+</nav>
+
+<main class="main-content">
+
+    <!-- ═══════════════ TAB: UPLOAD ═══════════════ -->
+    <section id="tab-upload" class="tab-content active fade-in">
+        <div class="section-header">
+            <div>
+                <div class="section-title">Upload &amp; Configure</div>
+                <div class="section-subtitle">Load two datasets to compare — supports CSV and Excel (.xlsx/.xls)</div>
+            </div>
+        </div>
+
+        <div class="upload-grid">
+            <!-- System A -->
+            <div class="card">
+                <div class="card-title">
+                    <span style="color:var(--color-system-a)">■</span> System A
+                </div>
+                <div id="upload-zone-a" class="upload-zone">
+                    <input type="file" id="file-input-a" accept=".csv,.xlsx,.xls">
+                    <span class="upload-icon">📂</span>
+                    <h3>Drop file or click to browse</h3>
+                    <p>CSV or Excel (.xlsx/.xls)<br>Supports 55,000+ records</p>
+                    <div class="btn btn-primary btn-sm" style="pointer-events:none">Choose File</div>
+                    <div id="file-info-a" class="file-info"></div>
+                </div>
+                <div id="upload-alert-a" class="mt-2"></div>
+            </div>
+
+            <!-- System B -->
+            <div class="card">
+                <div class="card-title">
+                    <span style="color:var(--color-system-b)">■</span> System B
+                </div>
+                <div id="upload-zone-b" class="upload-zone">
+                    <input type="file" id="file-input-b" accept=".csv,.xlsx,.xls">
+                    <span class="upload-icon">📂</span>
+                    <h3>Drop file or click to browse</h3>
+                    <p>CSV or Excel (.xlsx/.xls)<br>Supports 55,000+ records</p>
+                    <div class="btn btn-primary btn-sm" style="pointer-events:none">Choose File</div>
+                    <div id="file-info-b" class="file-info"></div>
+                </div>
+                <div id="upload-alert-b" class="mt-2"></div>
+            </div>
+        </div>
+
+        <!-- Configuration -->
+        <div class="card">
+            <div class="card-title">⚙️ Matching Configuration</div>
+            <div class="threshold-controls">
+                <div class="threshold-item">
+                    <label>
+                        <span>Match Confidence Threshold</span>
+                        <strong id="threshold-value" style="color:var(--accent)">70%</strong>
+                    </label>
+                    <input type="range" id="threshold-slider" min="50" max="100" value="70" step="5">
+                    <span class="text-xs text-muted">Records below this score are treated as unmatched</span>
+                </div>
+                <div class="threshold-item">
+                    <label>
+                        <span>ZIP Weight <span data-tooltip="Higher ZIP weight = ZIP code is more important for matching">(ℹ)</span></span>
+                        <strong id="weight-zip-val" style="color:var(--accent)">40</strong>
+                    </label>
+                    <input type="range" id="weight-zip" min="0" max="60" value="40" step="5">
+                </div>
+                <div class="threshold-item">
+                    <label>
+                        <span>State Weight</span>
+                        <strong id="weight-state-val" style="color:var(--accent)">30</strong>
+                    </label>
+                    <input type="range" id="weight-state" min="0" max="60" value="30" step="5">
+                </div>
+                <div class="threshold-item">
+                    <label>
+                        <span>City Weight</span>
+                        <strong id="weight-city-val" style="color:var(--accent)">20</strong>
+                    </label>
+                    <input type="range" id="weight-city" min="0" max="60" value="20" step="5">
+                </div>
+                <div class="threshold-item">
+                    <label>
+                        <span>Street Weight</span>
+                        <strong id="weight-street-val" style="color:var(--accent)">10</strong>
+                    </label>
+                    <input type="range" id="weight-street" min="0" max="60" value="10" step="5">
+                </div>
+            </div>
+
+            <div class="progress-container" style="display:none" id="match-progress-container">
+                <div class="progress-label">
+                    <span>Matching progress</span>
+                    <span id="match-progress-label">0%</span>
+                </div>
+                <div class="progress-bar-outer">
+                    <div id="match-progress-bar" class="progress-bar-inner"></div>
+                </div>
+            </div>
+
+            <div id="analyze-alert" class="mt-2"></div>
+            <div class="mt-3">
+                <button id="btn-analyze" class="btn btn-success btn-lg" disabled>
+                    🔍 Run Analysis
+                </button>
+                <span class="text-sm text-muted" style="margin-left:1rem">Load both files to enable</span>
+            </div>
+        </div>
+
+        <!-- Expected Format -->
+        <div class="card">
+            <div class="card-title">📄 Expected File Format</div>
+            <p class="text-sm text-secondary mb-3">Columns are auto-detected by name (case-insensitive). Supported column names:</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem">
+                <div>
+                    <div class="text-xs font-semibold text-muted mb-1 mt-1">STREET / ADDRESS</div>
+                    <div class="text-sm text-secondary">Address, Street, Street Address, Address Line 1, Addr</div>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-muted mb-1 mt-1">CITY</div>
+                    <div class="text-sm text-secondary">City, Town, Municipality</div>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-muted mb-1 mt-1">STATE</div>
+                    <div class="text-sm text-secondary">State, ST, Province, State_Code</div>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-muted mb-1 mt-1">ZIP / POSTAL</div>
+                    <div class="text-sm text-secondary">ZIP, ZIP Code, Postal Code, Postal, ZipCode</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ TAB: DASHBOARD ═══════════════ -->
+    <section id="tab-dashboard" class="tab-content fade-in">
+        <div class="section-header">
+            <div>
+                <div class="section-title">Analysis Dashboard</div>
+                <div class="section-subtitle">Comprehensive visual breakdown of address match results</div>
+            </div>
+            <button id="nav-export-pptx" class="btn btn-secondary btn-sm">📑 Export to PowerPoint</button>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="stats-grid">
+            <div class="stat-card system-a">
+                <div class="stat-value text-accent" id="stat-total-a">—</div>
+                <div class="stat-label">System A Records</div>
+            </div>
+            <div class="stat-card system-b">
+                <div class="stat-value" style="color:var(--color-system-b)" id="stat-total-b">—</div>
+                <div class="stat-label">System B Records</div>
+            </div>
+            <div class="stat-card perfect">
+                <div class="stat-value text-success" id="stat-matched">—</div>
+                <div class="stat-label">Matched Records</div>
+            </div>
+            <div class="stat-card neutral">
+                <div class="stat-value text-accent" id="stat-match-pct">—</div>
+                <div class="stat-label">Match Rate</div>
+            </div>
+            <div class="stat-card perfect">
+                <div class="stat-value text-success" id="stat-perfect">—</div>
+                <div class="stat-label">Perfect Matches</div>
+            </div>
+            <div class="stat-card high">
+                <div class="stat-value" style="color:var(--color-high)" id="stat-high">—</div>
+                <div class="stat-label">High Confidence</div>
+            </div>
+            <div class="stat-card partial">
+                <div class="stat-value" style="color:var(--color-partial)" id="stat-partial">—</div>
+                <div class="stat-label">Partial Matches</div>
+            </div>
+            <div class="stat-card none">
+                <div class="stat-value text-danger" id="stat-unmatched-a">—</div>
+                <div class="stat-label">Unmatched (A)</div>
+            </div>
+            <div class="stat-card none">
+                <div class="stat-value text-danger" id="stat-unmatched-b">—</div>
+                <div class="stat-label">Unmatched (B)</div>
+            </div>
+        </div>
+
+        <!-- Row 1: Pie + Bar -->
+        <div class="chart-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Match Distribution</div>
+                        <div class="chart-subtitle">Records by confidence level</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-match-dist" data-export-label="match_distribution">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:280px">
+                    <canvas id="chart-match-dist"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Match Summary</div>
+                        <div class="chart-subtitle">Record counts by category</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-match-summary" data-export-label="match_summary">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:280px">
+                    <canvas id="chart-match-summary"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Histogram (wide) -->
+        <div class="chart-grid">
+            <div class="chart-card wide">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Match Confidence Distribution</div>
+                        <div class="chart-subtitle">Number of matched records across confidence score ranges</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-confidence-hist" data-export-label="confidence_histogram">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:240px">
+                    <canvas id="chart-confidence-hist"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: States + Cities -->
+        <div class="chart-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Top States — Matched vs Unmatched</div>
+                        <div class="chart-subtitle">Top 15 states by record volume</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-states" data-export-label="top_states">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:320px">
+                    <canvas id="chart-states"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Top Cities Comparison</div>
+                        <div class="chart-subtitle">System A vs System B — top 10 cities</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-cities" data-export-label="top_cities">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:320px">
+                    <canvas id="chart-cities"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: Quality + Discrepancy + Volume -->
+        <div class="chart-grid chart-grid-3">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Address Quality (System A)</div>
+                        <div class="chart-subtitle">Complete vs incomplete address fields</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-quality" data-export-label="address_quality">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:260px">
+                    <canvas id="chart-quality"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Discrepancy Types</div>
+                        <div class="chart-subtitle">Types of mismatches in matched records</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-discrepancy" data-export-label="discrepancy_types">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:260px">
+                    <canvas id="chart-discrepancy"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Record Volume Comparison</div>
+                        <div class="chart-subtitle">Matched overlap vs unique records</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-volume" data-export-label="record_volume">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:260px">
+                    <canvas id="chart-volume"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: Completeness (wide) -->
+        <div class="chart-grid">
+            <div class="chart-card wide">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Data Completeness by Field</div>
+                        <div class="chart-subtitle">Percentage of complete values per field — System A vs System B</div>
+                    </div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" data-export-chart="chart-completeness" data-export-label="data_completeness">⬇ PNG</button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height:220px">
+                    <canvas id="chart-completeness"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ TAB: MATCH SUMMARY ═══════════════ -->
+    <section id="tab-match-summary" class="tab-content fade-in">
+        <div class="section-title mb-4">Match Summary</div>
+        <div class="stats-grid">
+            <div class="stat-card perfect">
+                <div class="stat-value text-success" id="stat-perfect2" style="font-size:1.5rem">—</div>
+                <div class="stat-label">Perfect (100%)</div>
+            </div>
+            <div class="stat-card high">
+                <div class="stat-value" style="color:var(--color-high);font-size:1.5rem" id="stat-high2">—</div>
+                <div class="stat-label">High (90–99%)</div>
+            </div>
+            <div class="stat-card partial">
+                <div class="stat-value" style="color:var(--color-partial);font-size:1.5rem" id="stat-partial2">—</div>
+                <div class="stat-label">Partial (70–89%)</div>
+            </div>
+            <div class="stat-card low">
+                <div class="stat-value" style="color:var(--color-low);font-size:1.5rem" id="stat-low2">—</div>
+                <div class="stat-label">Low (50–69%)</div>
+            </div>
+            <div class="stat-card none">
+                <div class="stat-value text-danger" style="font-size:1.5rem" id="stat-none2">—</div>
+                <div class="stat-label">No Match (&lt;50%)</div>
+            </div>
+        </div>
+        <div class="alert alert-info">
+            ℹ️ The match summary cards on the Dashboard tab are always up to date. This tab mirrors the same stats with additional context.
+        </div>
+    </section>
+
+    <!-- ═══════════════ TAB: GEOGRAPHIC ═══════════════ -->
+    <section id="tab-geographic" class="tab-content fade-in">
+        <div class="section-title mb-4">Geographic Breakdown</div>
+        <div class="geo-section">
+            <div class="card">
+                <div class="card-title">📍 By State (Top 20)</div>
+                <div class="table-container" id="geo-state-table">
+                    <div class="empty-state"><div class="empty-icon">🗺</div><p>Run analysis to see data</p></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">🏙 By City (Top 20)</div>
+                <div class="table-container" id="geo-city-table">
+                    <div class="empty-state"><div class="empty-icon">🏙</div><p>Run analysis to see data</p></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ TAB: ADDRESS QUALITY ═══════════════ -->
+    <section id="tab-quality" class="tab-content fade-in">
+        <div class="section-title mb-4">Address Quality Analysis</div>
+        <div class="quality-grid">
+            <div class="card">
+                <div class="card-title" style="color:var(--color-system-a)">■ System A Quality</div>
+                <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+                    <div class="stat-card perfect">
+                        <div class="stat-value text-success" id="qual-complete-a">—</div>
+                        <div class="stat-label">Complete</div>
+                    </div>
+                    <div class="stat-card none">
+                        <div class="stat-value text-warning" id="qual-incomplete-a">—</div>
+                        <div class="stat-label">Incomplete</div>
+                    </div>
+                    <div class="stat-card none">
+                        <div class="stat-value text-danger" id="qual-invalid-zip-a">—</div>
+                        <div class="stat-label">Invalid ZIP</div>
+                    </div>
+                    <div class="stat-card none">
+                        <div class="stat-value text-warning" id="qual-dupes-a">—</div>
+                        <div class="stat-label">Duplicates</div>
+                    </div>
+                </div>
+                <div class="card-title mt-3" style="font-size:0.875rem">Field Completeness</div>
+                <div id="quality-fields-a" class="field-completeness"></div>
+            </div>
+            <div class="card">
+                <div class="card-title" style="color:var(--color-system-b)">■ System B Quality</div>
+                <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+                    <div class="stat-card perfect">
+                        <div class="stat-value text-success" id="qual-complete-b">—</div>
+                        <div class="stat-label">Complete</div>
+                    </div>
+                    <div class="stat-card none">
+                        <div class="stat-value text-warning" id="qual-incomplete-b">—</div>
+                        <div class="stat-label">Incomplete</div>
+                    </div>
+                    <div class="stat-card none">
+                        <div class="stat-value text-danger" id="qual-invalid-zip-b">—</div>
+                        <div class="stat-label">Invalid ZIP</div>
+                    </div>
+                    <div class="stat-card none">
+                        <div class="stat-value text-warning" id="qual-dupes-b">—</div>
+                        <div class="stat-label">Duplicates</div>
+                    </div>
+                </div>
+                <div class="card-title mt-3" style="font-size:0.875rem">Field Completeness</div>
+                <div id="quality-fields-b" class="field-completeness"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ TAB: DETAILED RESULTS ═══════════════ -->
+    <section id="tab-results" class="tab-content fade-in">
+
+        <!-- Matched Records -->
+        <div class="card mb-4">
+            <div class="card-title">✅ Matched Records <span id="matched-count" class="text-muted text-sm font-normal"></span></div>
+            <div class="filter-bar">
+                <input type="text" id="matched-search" class="filter-input" placeholder="🔍 Search street or city…">
+                <select id="matched-confidence-filter" class="filter-input">
+                    <option value="all">All Confidence Levels</option>
+                    <option value="perfect">Perfect (100%)</option>
+                    <option value="high">High (90–99%)</option>
+                    <option value="partial">Partial (70–89%)</option>
+                    <option value="low">Low (50–69%)</option>
+                    <option value="none">No Match (&lt;50%)</option>
+                </select>
+                <input type="text" id="matched-state-filter" class="filter-input" style="min-width:100px;max-width:120px" placeholder="State (IL)">
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Score</th>
+                            <th>Street A</th><th>City A</th><th>State A</th><th>ZIP A</th>
+                            <th>Street B</th><th>City B</th><th>State B</th><th>ZIP B</th>
+                        </tr>
+                    </thead>
+                    <tbody id="matched-tbody">
+                        <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-muted)">Run analysis to see results</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="matched-pagination" class="pagination"></div>
+        </div>
+
+        <!-- Unmatched A -->
+        <div class="card mb-4">
+            <div class="card-title">⚠️ Unmatched — System A <span id="unmatched-a-count" class="text-muted text-sm font-normal"></span></div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Street</th><th>City</th><th>State</th><th>ZIP</th></tr></thead>
+                    <tbody id="unmatched-a-tbody">
+                        <tr><td colspan="4" style="text-align:center;padding:2rem;color:var(--text-muted)">Run analysis to see results</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="unmatched-a-pagination" class="pagination"></div>
+        </div>
+
+        <!-- Unmatched B -->
+        <div class="card">
+            <div class="card-title">⚠️ Unmatched — System B <span id="unmatched-b-count" class="text-muted text-sm font-normal"></span></div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Street</th><th>City</th><th>State</th><th>ZIP</th></tr></thead>
+                    <tbody id="unmatched-b-tbody">
+                        <tr><td colspan="4" style="text-align:center;padding:2rem;color:var(--text-muted)">Run analysis to see results</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="unmatched-b-pagination" class="pagination"></div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ TAB: EXPORT ═══════════════ -->
+    <section id="tab-export" class="tab-content fade-in">
+        <div class="section-title mb-1">Export Data &amp; Reports</div>
+        <div class="section-subtitle mb-4">Download analysis results in various formats</div>
+        <div id="export-alert" class="mb-3"></div>
+
+        <!-- PowerPoint Export (featured) -->
+        <div class="card mb-4" style="border-color:var(--accent);background:rgba(59,130,246,0.05)">
+            <div class="card-title" style="color:var(--accent)">📑 PowerPoint Presentation Export</div>
+            <p class="text-sm text-secondary mb-3">
+                Generate a complete, professional PowerPoint (.pptx) presentation with all analysis breakdowns,
+                chart images, statistics tables, and a summary slide — ready for leadership briefings or reporting.
+            </p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.5rem;margin-bottom:1rem">
+                <div class="text-sm text-secondary">✅ Slide 1: Title &amp; Overview</div>
+                <div class="text-sm text-secondary">✅ Slide 2: Match Summary Stats</div>
+                <div class="text-sm text-secondary">✅ Slide 3: Match Distribution Chart</div>
+                <div class="text-sm text-secondary">✅ Slide 4: Confidence Histogram</div>
+                <div class="text-sm text-secondary">✅ Slide 5: Geographic Breakdown</div>
+                <div class="text-sm text-secondary">✅ Slide 6: Top Cities + Table</div>
+                <div class="text-sm text-secondary">✅ Slide 7: Address Quality</div>
+                <div class="text-sm text-secondary">✅ Slide 8: Data Completeness</div>
+                <div class="text-sm text-secondary">✅ Slide 9: Discrepancy Analysis</div>
+                <div class="text-sm text-secondary">✅ Slide 10: Volume Comparison</div>
+                <div class="text-sm text-secondary">✅ Slide 11: Key Findings Summary</div>
+            </div>
+            <button id="export-pptx-main" class="btn btn-primary btn-lg" onclick="App.exportPowerPoint()">
+                📑 Download PowerPoint Report
+            </button>
+        </div>
+
+        <!-- CSV Exports -->
+        <div class="card">
+            <div class="card-title">📊 CSV &amp; Text Exports</div>
+            <div class="export-grid">
+                <div class="export-card">
+                    <h4>✅ Matched Records</h4>
+                    <p>All matched records with confidence scores, both system addresses, and discrepancy notes side-by-side.</p>
+                    <button id="export-matched-csv" class="btn btn-primary btn-sm">⬇ Download CSV</button>
+                </div>
+                <div class="export-card">
+                    <h4>⚠️ Unmatched — System A</h4>
+                    <p>Records from System A that could not be matched to any record in System B.</p>
+                    <button id="export-unmatched-a-csv" class="btn btn-primary btn-sm">⬇ Download CSV</button>
+                </div>
+                <div class="export-card">
+                    <h4>⚠️ Unmatched — System B</h4>
+                    <p>Records from System B that could not be matched to any record in System A.</p>
+                    <button id="export-unmatched-b-csv" class="btn btn-primary btn-sm">⬇ Download CSV</button>
+                </div>
+                <div class="export-card">
+                    <h4>📋 Analysis Summary</h4>
+                    <p>Full summary statistics including match rates, address quality metrics, and counts.</p>
+                    <button id="export-summary-csv" class="btn btn-primary btn-sm">⬇ Download CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart PNG Exports -->
+        <div class="card mt-4">
+            <div class="card-title">🖼 Chart Image Exports (PNG)</div>
+            <div class="export-grid">
+                <div class="export-card">
+                    <h4>Match Distribution Pie</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-match-dist" data-export-label="match_distribution">⬇ Download PNG</button>
+                </div>
+                <div class="export-card">
+                    <h4>Match Summary Bar</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-match-summary" data-export-label="match_summary">⬇ Download PNG</button>
+                </div>
+                <div class="export-card">
+                    <h4>Confidence Histogram</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-confidence-hist" data-export-label="confidence_histogram">⬇ Download PNG</button>
+                </div>
+                <div class="export-card">
+                    <h4>Top States Chart</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-states" data-export-label="top_states">⬇ Download PNG</button>
+                </div>
+                <div class="export-card">
+                    <h4>Top Cities Chart</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-cities" data-export-label="top_cities">⬇ Download PNG</button>
+                </div>
+                <div class="export-card">
+                    <h4>Address Quality Pie</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-quality" data-export-label="address_quality">⬇ Download PNG</button>
+                </div>
+                <div class="export-card">
+                    <h4>Discrepancy Types</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-discrepancy" data-export-label="discrepancy_types">⬇ Download PNG</button>
+                </div>
+                <div class="export-card">
+                    <h4>Data Completeness</h4>
+                    <button class="btn btn-secondary btn-sm" data-export-chart="chart-completeness" data-export-label="data_completeness">⬇ Download PNG</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- CDN Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+
+<!-- Application Scripts -->
+<script src="js/matcher.js"></script>
+<script src="js/analyzer.js"></script>
+<script src="js/visualizations.js"></script>
+<script src="js/app.js"></script>
+
+<!-- Wire secondary stat cards on dashboard render -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const observer = new MutationObserver(() => {
+        const v = (id) => document.getElementById(id)?.textContent || '—';
+        document.getElementById('stat-perfect2')?.setAttribute('data-val', v('stat-perfect'));
+        ['stat-perfect2','stat-high2','stat-partial2','stat-low2','stat-none2'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.textContent === '—') {
+                const map = { 'stat-perfect2':'stat-perfect','stat-high2':'stat-high','stat-partial2':'stat-partial','stat-low2':'stat-unmatched-a','stat-none2':'stat-unmatched-b' };
+                // will be populated by app.js setStatCard directly
+            }
+        });
+    });
+    const matchedEl = document.getElementById('stat-matched');
+    if (matchedEl) observer.observe(matchedEl, { childList: true, characterData: true, subtree: true });
+});
+</script>
+
+</body>
+</html>

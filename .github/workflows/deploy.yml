@@ -1,0 +1,243 @@
+# =============================================================================
+# deploy.yml — CI/CD Pipeline: Deploy to AWS GovCloud S3 + CloudFront
+#
+# Triggers:
+#   • Push to main branch (automatic deploy to prod)
+#   • Push to develop branch (automatic deploy to staging)
+#   • Manual workflow_dispatch with environment selector
+#
+# Required GitHub Actions Secrets:
+#   AWS_ACCESS_KEY_ID_GOVCLOUD     — GovCloud IAM access key
+#   AWS_SECRET_ACCESS_KEY_GOVCLOUD — GovCloud IAM secret key
+#   S3_BUCKET_PROD                 — Production S3 bucket name
+#   S3_BUCKET_STAGING              — Staging S3 bucket name
+#   CLOUDFRONT_DIST_ID_PROD        — Production CloudFront distribution ID (optional)
+#   CLOUDFRONT_DIST_ID_STAGING     — Staging CloudFront distribution ID (optional)
+#
+# Optional Secrets (for notifications):
+#   SLACK_WEBHOOK_URL              — Slack incoming webhook for deploy notifications
+#
+# IAM Permissions required for deploy user:
+#   s3:ListBucket, s3:GetObject, s3:PutObject, s3:DeleteObject
+#   s3:GetBucketLocation, s3:GetBucketWebsite
+#   cloudfront:CreateInvalidation, cloudfront:GetDistribution (optional)
+# =============================================================================
+
+name: Deploy to AWS GovCloud
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - 'infrastructure/**'
+      - 'scripts/**'
+      - '**.md'
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - prod
+      invalidate_cache:
+        description: 'Invalidate CloudFront cache after deploy'
+        required: false
+        default: true
+        type: boolean
+
+# Cancel any in-progress deployment to the same branch
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_DEFAULT_REGION: us-gov-west-1
+  # Site directories/files to exclude from S3 sync
+  S3_EXCLUDE: >-
+    --exclude ".git/*"
+    --exclude ".github/*"
+    --exclude "infrastructure/*"
+    --exclude "scripts/*"
+    --exclude "*.sh"
+    --exclude "*.ps1"
+    --exclude "*.tf"
+    --exclude "*.tfvars"
+    --exclude "*.tfstate"
+    --exclude ".terraform/*"
+    --exclude "*.md"
+    --exclude "node_modules/*"
+
+jobs:
+  # ── Determine environment ──────────────────────────────────
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      environment:   ${{ steps.env.outputs.environment }}
+      bucket:        ${{ steps.env.outputs.bucket }}
+      distribution:  ${{ steps.env.outputs.distribution }}
+      site_url:      ${{ steps.env.outputs.site_url }}
+    steps:
+      - name: Determine target environment
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV="prod"
+          else
+            ENV="staging"
+          fi
+          echo "environment=$ENV" >> "$GITHUB_OUTPUT"
+
+          if [[ "$ENV" == "prod" ]]; then
+            echo "bucket=${{ secrets.S3_BUCKET_PROD }}"             >> "$GITHUB_OUTPUT"
+            echo "distribution=${{ secrets.CLOUDFRONT_DIST_ID_PROD }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "bucket=${{ secrets.S3_BUCKET_STAGING }}"             >> "$GITHUB_OUTPUT"
+            echo "distribution=${{ secrets.CLOUDFRONT_DIST_ID_STAGING }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Deploy ────────────────────────────────────────────────
+  deploy:
+    name: Deploy (${{ needs.setup.outputs.environment }})
+    runs-on: ubuntu-latest
+    needs: setup
+    environment: ${{ needs.setup.outputs.environment }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (GovCloud)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID_GOVCLOUD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_GOVCLOUD }}
+          aws-region:            ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Verify AWS identity
+        run: |
+          aws sts get-caller-identity
+          echo "Deploying to bucket: ${{ needs.setup.outputs.bucket }}"
+
+      - name: Validate bucket exists
+        run: |
+          BUCKET="${{ needs.setup.outputs.bucket }}"
+          if [[ -z "$BUCKET" ]]; then
+            echo "::error::S3 bucket name secret is not set for ${{ needs.setup.outputs.environment }}."
+            exit 1
+          fi
+          aws s3 ls "s3://$BUCKET" > /dev/null 2>&1 || {
+            echo "::error::Bucket s3://$BUCKET not found or not accessible."
+            exit 1
+          }
+
+      - name: Sync site files to S3
+        run: |
+          BUCKET="${{ needs.setup.outputs.bucket }}"
+          aws s3 sync ./ "s3://$BUCKET/" \
+            --delete \
+            --region "$AWS_DEFAULT_REGION" \
+            --cache-control "max-age=3600" \
+            --metadata-directive REPLACE \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "infrastructure/*" \
+            --exclude "scripts/*" \
+            --exclude "*.sh" \
+            --exclude "*.ps1" \
+            --exclude "*.tf" \
+            --exclude "*.tfvars" \
+            --exclude "*.tfstate" \
+            --exclude ".terraform/*" \
+            --exclude "*.md" \
+            --exclude "node_modules/*"
+
+      - name: Set immutable cache on CSS/JS assets
+        run: |
+          BUCKET="${{ needs.setup.outputs.bucket }}"
+          # CSS assets — long cache
+          aws s3 cp "s3://$BUCKET/css/" "s3://$BUCKET/css/" \
+            --recursive \
+            --metadata-directive REPLACE \
+            --cache-control "public, max-age=31536000, immutable" \
+            --region "$AWS_DEFAULT_REGION" || true
+
+          # JS assets — long cache
+          aws s3 cp "s3://$BUCKET/js/" "s3://$BUCKET/js/" \
+            --recursive \
+            --metadata-directive REPLACE \
+            --cache-control "public, max-age=31536000, immutable" \
+            --region "$AWS_DEFAULT_REGION" || true
+
+          # index.html — never cache
+          aws s3 cp "s3://$BUCKET/index.html" "s3://$BUCKET/index.html" \
+            --metadata-directive REPLACE \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --region "$AWS_DEFAULT_REGION" || true
+
+      - name: Invalidate CloudFront cache
+        if: >
+          needs.setup.outputs.distribution != '' &&
+          (github.event.inputs.invalidate_cache != 'false')
+        run: |
+          DIST_ID="${{ needs.setup.outputs.distribution }}"
+          echo "Creating CloudFront invalidation for distribution: $DIST_ID"
+          RESULT=$(aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths "/*" \
+            --region "$AWS_DEFAULT_REGION" 2>&1)
+          echo "$RESULT"
+          INV_ID=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['Invalidation']['Id'])" 2>/dev/null || echo "unknown")
+          echo "Invalidation ID: $INV_ID"
+
+      - name: Deployment summary
+        run: |
+          echo "## ✅ Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Environment | ${{ needs.setup.outputs.environment }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| S3 Bucket | ${{ needs.setup.outputs.bucket }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Region | ${{ env.AWS_DEFAULT_REGION }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | ${{ github.sha }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Notify (optional Slack) ───────────────────────────────
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [setup, deploy]
+    if: always() && secrets.SLACK_WEBHOOK_URL != ''
+    permissions: {}
+    steps:
+      - name: Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "${{ needs.deploy.result == 'success' && '✅' || '❌' }} Address Tool deploy to *${{ needs.setup.outputs.environment }}* ${{ needs.deploy.result }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ needs.deploy.result == 'success' && '✅' || '❌' }} *Address Summary Organizing Tool* — Deploy to `${{ needs.setup.outputs.environment }}`\n*Status:* ${{ needs.deploy.result }}\n*Commit:* `${{ github.sha }}`\n*By:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
