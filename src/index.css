@@ -1,0 +1,41 @@
+:root {
+  --usps-navy: #1B3A6B;
+  --usps-blue: #004B87;
+  --usps-red: #E31837;
+  --usps-white: #FFFFFF;
+  --usps-gray: #F5F5F5;
+  --usps-dark-navy: #15305A;
+  --usps-orange: #FF6B35;
+  --usps-green: #28A745;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--usps-gray);
+  color: #1a1a1a;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+button {
+  font-family: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
