@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "chart.js": "^4.5.1",
+    "exceljs": "^4.4.0",
     "leaflet": "^1.9.4",
     "localforage": "^1.10.0",
     "papaparse": "^5.5.3",
@@ -19,8 +20,7 @@
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.13.1",
-    "xlsx": "^0.18.5"
+    "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
