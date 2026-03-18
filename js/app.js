@@ -230,7 +230,7 @@ const App = (() => {
             renderDashboard();
             transitionToAnalysisView();
             showTab('dashboard');
-            enableAnalysisTabs();
+            enableExportButton();
         } catch (err) {
             hideLoading();
             showAlert('analyze-alert', 'danger', 'Analysis failed: ' + err.message);
@@ -238,7 +238,7 @@ const App = (() => {
         }
     }
 
-    function enableAnalysisTabs() {
+    function enableExportButton() {
         document.getElementById('export-pptx-btn').disabled = false;
     }
 
