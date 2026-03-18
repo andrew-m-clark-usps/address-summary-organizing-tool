@@ -514,7 +514,7 @@ const Visualizations = (() => {
      * Render all charts from a full analysis result
      */
     function renderAll(analysis) {
-        const { summary, quality, geo, cities } = analysis;
+        const { summary, quality, geo, cities, extendedAIMetrics, geoMetrics, addressTypes, fieldContribution, discrepancyPatterns } = analysis;
         renderMatchDistributionPie(summary);
         renderMatchSummaryBar(summary);
         renderTopStatesChart(geo.geoMatch);
@@ -525,6 +525,19 @@ const Visualizations = (() => {
         renderDiscrepancyChart(summary.discrepancyTypes);
         renderVolumeComparisonChart(summary);
         // AI charts rendered separately via renderAIMetrics() in app.js
+
+        // Extended charts
+        if (extendedAIMetrics) {
+            renderAIScoreDistribution(extendedAIMetrics);
+            renderAIMetricsRadar(extendedAIMetrics);
+            renderAIScoreHistogram(extendedAIMetrics);
+        }
+        if (geoMetrics) renderGeoDistanceChart(geoMetrics);
+        if (addressTypes) renderAddressTypeChart(addressTypes);
+        if (fieldContribution) renderFieldImportanceChart(fieldContribution);
+        renderExpandedCompletenessChart(quality.a, quality.b);
+        if (discrepancyPatterns) renderDiscrepancyCombosChart(discrepancyPatterns);
+        renderDataQualityGauge(quality.a, quality.b);
     }
 
     /**
@@ -698,6 +711,474 @@ const Visualizations = (() => {
     }
 
     /**
+     * Extended Chart 1: AI Score Distribution Doughnut
+     */
+    function renderAIScoreDistribution(extendedAIMetrics) {
+        const ctx = getCtx('chart-ai-score-dist');
+        if (!ctx) return;
+        const dist = extendedAIMetrics && extendedAIMetrics.aiConfidenceDistribution;
+        if (!dist) return;
+        const high   = dist.high   || 0;
+        const medium = dist.medium || 0;
+        const low    = dist.low    || 0;
+        chartInstances['chart-ai-score-dist'] = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['High (≥80)', 'Medium (50-79)', 'Low (<50)'],
+                datasets: [{
+                    data: [high, medium, low],
+                    backgroundColor: [COLORS.perfect, COLORS.partial, COLORS.none],
+                    borderColor: '#FFFFFF',
+                    borderWidth: 2,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: defaultTickColor, padding: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                                return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '55%'
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 2: AI Score vs Traditional Score Scatter
+     */
+    function renderAIVsTraditionalScatter(matchResults) {
+        const ctx = getCtx('chart-ai-vs-traditional');
+        if (!ctx) return;
+        if (!matchResults || !matchResults.matched) return;
+        const points = matchResults.matched.slice(0, 500).map(m => ({ x: m.aiScore, y: m.score }));
+        const bgColors = points.map(p => {
+            if (p.y >= 90) return ALPHA(COLORS.perfect, 0.7);
+            if (p.y >= 70) return ALPHA(COLORS.partial, 0.7);
+            return ALPHA(COLORS.none, 0.7);
+        });
+        chartInstances['chart-ai-vs-traditional'] = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Matches',
+                    data: points,
+                    backgroundColor: bgColors,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` AI: ${ctx.parsed.x}  Traditional: ${ctx.parsed.y}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' },
+                        title: { display: true, text: 'AI Score', color: defaultTickColor }
+                    },
+                    y: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' },
+                        title: { display: true, text: 'Traditional Score', color: defaultTickColor }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 3: AI Metrics Radar
+     */
+    function renderAIMetricsRadar(extendedAIMetrics) {
+        const ctx = getCtx('chart-ai-metrics-radar');
+        if (!ctx) return;
+        if (!extendedAIMetrics) return;
+        const avg = extendedAIMetrics.avgAlgorithmScores || {};
+        const data = [
+            (avg.jaccard         || 0) * 100,
+            (avg.jaroWinkler     || 0) * 100,
+            (avg.nGram           || 0) * 100,
+            (avg.tokenOverlap    || 0) * 100,
+            (avg.soundex         || 0) * 100,
+            (avg.levenshteinSim  || 0) * 100
+        ];
+        chartInstances['chart-ai-metrics-radar'] = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Jaccard', 'Jaro-Winkler', 'N-Gram', 'Token Overlap', 'Soundex', 'Levenshtein Sim'],
+                datasets: [{
+                    label: 'Avg Score',
+                    data,
+                    backgroundColor: ALPHA(COLORS.systemA, 0.2),
+                    borderColor: COLORS.systemA,
+                    borderWidth: 2,
+                    pointBackgroundColor: COLORS.systemA,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.r.toFixed(1)}` } }
+                },
+                scales: {
+                    r: {
+                        min: 0, max: 100,
+                        ticks: { color: defaultTickColor, stepSize: 20, backdropColor: 'transparent' },
+                        grid: { color: defaultGridColor },
+                        pointLabels: { color: defaultTextColor, font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 4: Geo Distance Distribution Bar
+     */
+    function renderGeoDistanceChart(geoMetrics) {
+        const ctx = getCtx('chart-geo-distance');
+        if (!ctx) return;
+        if (!geoMetrics) return;
+        const w01  = geoMetrics.matchesWithin_01mi  || 0;
+        const w1   = geoMetrics.matchesWithin_1mi   || 0;
+        const w5   = geoMetrics.matchesWithin_5mi   || 0;
+        const bnd  = geoMetrics.matchesBeyond_10mi  || 0;
+        const buckets = [w01, w1 - w01, w5 - w1, bnd];
+        chartInstances['chart-geo-distance'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['< 0.1 mi', '0.1-1 mi', '1-5 mi', '5-10+ mi'],
+                datasets: [{
+                    label: 'Matches',
+                    data: buckets,
+                    backgroundColor: [COLORS.perfect, COLORS.partial, ALPHA(COLORS.low, 0.9), COLORS.none],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` Matches: ${ctx.parsed.y.toLocaleString()}` } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: defaultTickColor } },
+                    y: {
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 5: Address Type Match Rate Horizontal Bar
+     */
+    function renderAddressTypeChart(addressTypes) {
+        const ctx = getCtx('chart-address-type');
+        if (!ctx) return;
+        if (!addressTypes || !addressTypes.matchRateByType) return;
+        const typeMap = addressTypes.matchRateByType;
+        const labels = ['residential', 'commercial', 'PO Box', 'military', 'unknown'];
+        const data   = labels.map(l => typeMap[l] || 0);
+        chartInstances['chart-address-type'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Match Rate %',
+                    data,
+                    backgroundColor: [
+                        ALPHA(COLORS.perfect, 0.8),
+                        ALPHA(COLORS.systemA, 0.8),
+                        ALPHA(COLORS.partial, 0.8),
+                        ALPHA(COLORS.high,    0.8),
+                        ALPHA(COLORS.none,    0.6)
+                    ],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` Match Rate: ${ctx.parsed.x}%` } }
+                },
+                scales: {
+                    x: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' }
+                    },
+                    y: { grid: { display: false }, ticks: { color: defaultTickColor } }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 6: Field Importance Horizontal Bar
+     */
+    function renderFieldImportanceChart(fieldContribution) {
+        const ctx = getCtx('chart-field-importance');
+        if (!ctx) return;
+        if (!fieldContribution || !fieldContribution.fieldImportance) return;
+        const sorted = [...fieldContribution.fieldImportance].sort((a, b) => b.avgComponentScore - a.avgComponentScore);
+        const labels = sorted.map(f => f.field);
+        const data   = sorted.map(f => f.avgComponentScore);
+        const bgColors = data.map(v => {
+            const ratio = v / 100;
+            const r = Math.round(37  + (37  - 37)  * ratio);
+            const g = Math.round(99  + (150 - 99)  * ratio);
+            const b = Math.round(235 + (235 - 235) * ratio);
+            return `rgba(${r},${g},${b},${0.5 + ratio * 0.4})`;
+        });
+        chartInstances['chart-field-importance'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Avg Component Score',
+                    data,
+                    backgroundColor: bgColors,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` Score: ${ctx.parsed.x}%` } }
+                },
+                scales: {
+                    x: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' }
+                    },
+                    y: { grid: { display: false }, ticks: { color: defaultTickColor } }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 7: Expanded Field Completeness Grouped Bar
+     */
+    function renderExpandedCompletenessChart(qualityA, qualityB) {
+        const ctx = getCtx('chart-field-completeness-expanded');
+        if (!ctx) return;
+        const fields = ['Street', 'City', 'State', 'ZIP', 'Addr2', 'County', 'Lat', 'Lon', 'ZIP+4', 'Carrier Route', 'Delivery Pt'];
+        const keys   = ['street', 'city', 'state', 'zip', 'addr2', 'county', 'lat', 'lon', 'zipPlus4', 'carrierRoute', 'deliveryPoint'];
+        const fcA = (qualityA && qualityA.fieldCompleteness) || {};
+        const fcB = (qualityB && qualityB.fieldCompleteness) || {};
+        const dataA = keys.map(k => fcA[k] || 0);
+        const dataB = keys.map(k => fcB[k] || 0);
+        chartInstances['chart-field-completeness-expanded'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: fields,
+                datasets: [
+                    {
+                        label: 'System A',
+                        data: dataA,
+                        backgroundColor: ALPHA(COLORS.systemA, 0.85),
+                        borderRadius: 3
+                    },
+                    {
+                        label: 'System B',
+                        data: dataB,
+                        backgroundColor: ALPHA(COLORS.systemB, 0.85),
+                        borderRadius: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: defaultTickColor, font: { size: 11 } } },
+                    tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y}%` } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: defaultTickColor, font: { size: 9 } } },
+                    y: {
+                        min: 0, max: 100,
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v + '%' }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 8: Top Discrepancy Combos Horizontal Bar
+     */
+    function renderDiscrepancyCombosChart(discrepancyPatterns) {
+        const ctx = getCtx('chart-discrepancy-combo');
+        if (!ctx) return;
+        if (!discrepancyPatterns || !discrepancyPatterns.comboFrequency) return;
+        const entries = Object.entries(discrepancyPatterns.comboFrequency)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+        const labels = entries.map(([k]) => k.length > 30 ? k.substring(0, 30) + '…' : k);
+        const data   = entries.map(([, v]) => v);
+        const redShades = [
+            ALPHA(COLORS.none, 0.9),
+            ALPHA(COLORS.none, 0.75),
+            ALPHA(COLORS.none, 0.6),
+            ALPHA(COLORS.none, 0.45),
+            ALPHA(COLORS.none, 0.3)
+        ];
+        chartInstances['chart-discrepancy-combo'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Occurrences',
+                    data,
+                    backgroundColor: redShades.slice(0, data.length),
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` Occurrences: ${ctx.parsed.x.toLocaleString()}` } }
+                },
+                scales: {
+                    x: {
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v },
+                        beginAtZero: true
+                    },
+                    y: { grid: { display: false }, ticks: { color: defaultTickColor, font: { size: 10 } } }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 9: AI Score Histogram (20 buckets)
+     */
+    function renderAIScoreHistogram(extendedAIMetrics) {
+        const ctx = getCtx('chart-ai-score-histogram');
+        if (!ctx) return;
+        if (!extendedAIMetrics || !extendedAIMetrics.aiScoreHistogram) return;
+        const histogram = extendedAIMetrics.aiScoreHistogram;
+        const labels = Array.from({ length: 20 }, (_, i) => {
+            const lo = i * 5;
+            const hi = lo + 4;
+            return `${lo}-${hi === 99 ? 99 : hi}`;
+        });
+        labels[19] = '95-100';
+        const bgColors = histogram.map((_, i) => {
+            const mid = i * 5 + 2;
+            if (mid < 50) return ALPHA(COLORS.none,    0.7);
+            if (mid < 70) return ALPHA(COLORS.partial, 0.7);
+            if (mid < 85) return ALPHA(COLORS.high,    0.7);
+            return ALPHA(COLORS.perfect, 0.7);
+        });
+        chartInstances['chart-ai-score-histogram'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Records',
+                    data: histogram,
+                    backgroundColor: bgColors,
+                    borderRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ` Records: ${ctx.parsed.y.toLocaleString()}` } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: defaultTickColor, font: { size: 9 }, maxRotation: 45 } },
+                    y: {
+                        grid: { color: defaultGridColor },
+                        ticks: { color: defaultTickColor, callback: (v) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Extended Chart 10: Data Quality Gauge (two doughnut canvases)
+     */
+    function renderDataQualityGauge(qualityA, qualityB) {
+        function _renderGauge(canvasId, score) {
+            const ctx = getCtx(canvasId);
+            if (!ctx) return;
+            const safeScore = score || 0;
+            const color = safeScore >= 80 ? COLORS.perfect : safeScore >= 60 ? COLORS.partial : COLORS.none;
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [safeScore, 100 - safeScore],
+                        backgroundColor: [color, 'rgba(229,231,235,0.4)'],
+                        borderColor: ['#FFFFFF', '#FFFFFF'],
+                        borderWidth: 2,
+                        hoverOffset: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => ` DQ Score: ${safeScore}%` } }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+        _renderGauge('chart-dq-gauge-a', qualityA && qualityA.dataQualityScore);
+        _renderGauge('chart-dq-gauge-b', qualityB && qualityB.dataQualityScore);
+    }
+
+    /**
      * Export a chart canvas as PNG
      */
     function exportChartPng(canvasId, filename) {
@@ -733,6 +1214,16 @@ const Visualizations = (() => {
         renderComponentScoresBar,
         renderConfidenceBandChart,
         renderDQComparisonBar,
+        renderAIScoreDistribution,
+        renderAIVsTraditionalScatter,
+        renderAIMetricsRadar,
+        renderGeoDistanceChart,
+        renderAddressTypeChart,
+        renderFieldImportanceChart,
+        renderExpandedCompletenessChart,
+        renderDiscrepancyCombosChart,
+        renderAIScoreHistogram,
+        renderDataQualityGauge,
         exportChartPng,
         getChartDataUrl,
         chartInstances,

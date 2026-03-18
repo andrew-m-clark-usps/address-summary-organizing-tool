@@ -27,6 +27,22 @@ const AddressMatcher = (() => {
         'TX','UT','VT','VA','WA','WV','WI','WY','DC','PR','GU','VI','AS','MP'
     ]);
 
+    // Soundex character-to-digit map (shared across calls)
+    const SOUNDEX_MAP = {
+        B:1,F:1,P:1,V:1, C:2,G:2,J:2,K:2,Q:2,S:2,X:2,Z:2,
+        D:3,T:3, L:4, M:5,N:5, R:6
+    };
+
+    // AI composite score weights (must sum to 1.0 for the no-geo case)
+    const AI_WEIGHTS = {
+        jaccard:    0.20,
+        jaroWinkler:0.25,
+        nGram:      0.20,
+        soundex:    0.10,
+        tokenOverlap:0.15,
+        levenshtein:0.10  // split to 0.05/0.05 when geo is available
+    };
+
     /**
      * Standardize an address string for matching
      */
@@ -132,9 +148,17 @@ const AddressMatcher = (() => {
     /**
      * Calculate confidence score between two records (0-100)
      * Weights: ZIP=40%, State=30%, City=20%, Street=10%
+     * Optional bonus weights: addressLine2, county, zipPlus4, carrierRoute, congressionalDistrict
      */
     function calculateConfidence(recA, recB, weights) {
         const w = weights || { zip: 40, state: 30, city: 20, street: 10 };
+        const bonus = {
+            address2: w.address2 || 0,
+            county: w.county || 0,
+            zipPlus4: w.zipPlus4 || 0,
+            carrierRoute: w.carrierRoute || 0,
+            congressionalDistrict: w.congressionalDistrict || 0
+        };
 
         // ZIP comparison
         const zipA = normalizeZip(recA.zip);
@@ -176,12 +200,38 @@ const AddressMatcher = (() => {
             streetScore = 50;
         }
 
-        const score = Math.round(
-            (zipScore * w.zip + stateScore * w.state + cityScore * w.city + streetScore * w.street) / 100
-        );
+        // Core score (normalized to base weights)
+        const baseTotal = w.zip + w.state + w.city + w.street;
+        let score = (zipScore * w.zip + stateScore * w.state + cityScore * w.city + streetScore * w.street) / baseTotal;
+
+        // Optional bonus fields — each adds a proportional boost if both records have values
+        const bonusFields = [
+            { key: 'address2',             weight: bonus.address2,               scoreA: recA.address2,             scoreB: recB.address2 },
+            { key: 'county',               weight: bonus.county,                 scoreA: recA.county,               scoreB: recB.county },
+            { key: 'zipPlus4',             weight: bonus.zipPlus4,               scoreA: recA.zipPlus4,             scoreB: recB.zipPlus4 },
+            { key: 'carrierRoute',         weight: bonus.carrierRoute,           scoreA: recA.carrierRoute,         scoreB: recB.carrierRoute },
+            { key: 'congressionalDistrict',weight: bonus.congressionalDistrict,  scoreA: recA.congressionalDistrict,scoreB: recB.congressionalDistrict }
+        ];
+
+        let bonusScore = 0;
+        let bonusWeightTotal = 0;
+        bonusFields.forEach(({ weight, scoreA, scoreB }) => {
+            if (!weight) return;
+            bonusWeightTotal += weight;
+            if (scoreA && scoreB) {
+                bonusScore += stringSimilarity(String(scoreA), String(scoreB)) * 100 * weight;
+            } else if (!scoreA && !scoreB) {
+                // Both fields absent: treat as neutral (50%) to avoid penalizing incomplete records
+                bonusScore += 50 * weight;
+            }
+        });
+
+        if (bonusWeightTotal > 0) {
+            score = (score * baseTotal + bonusScore) / (baseTotal + bonusWeightTotal);
+        }
 
         return {
-            score: Math.min(100, Math.max(0, score)),
+            score: Math.min(100, Math.max(0, Math.round(score))),
             zipScore,
             stateScore,
             cityScore,
@@ -268,11 +318,12 @@ const AddressMatcher = (() => {
             if (exactMap.has(keyA)) {
                 const bIdx = exactMap.get(keyA);
                 if (!matchedBIndices.has(bIdx)) {
+                    const recB = dataB[bIdx];
                     matchedBIndices.add(bIdx);
-                    const discrepancies = detectDiscrepancies(recA, dataB[bIdx]);
+                    const discrepancies = detectDiscrepancies(recA, recB);
                     matched.push({
                         recordA: recA,
-                        recordB: dataB[bIdx],
+                        recordB: recB,
                         score: 100,
                         label: 'perfect',
                         discrepancies,
@@ -280,7 +331,13 @@ const AddressMatcher = (() => {
                         stateScore: 100,
                         cityScore: 100,
                         streetScore: 100,
-                        matchType: 'exact'
+                        matchType: 'exact',
+                        aiScore: calculateCompositeAIScore(recA, recB),
+                        aiScoreBreakdown: getAIScoreBreakdown(recA, recB),
+                        addressTypeA: detectAddressType(recA),
+                        addressTypeB: detectAddressType(recB),
+                        completenessA: calculateRecordCompleteness(recA),
+                        completenessB: calculateRecordCompleteness(recB)
                     });
                     continue;
                 }
@@ -327,11 +384,12 @@ const AddressMatcher = (() => {
             }
 
             if (bestScore >= threshold && bestBIdx >= 0) {
+                const recB = dataB[bestBIdx];
                 matchedBIndices.add(bestBIdx);
-                const discrepancies = detectDiscrepancies(recA, dataB[bestBIdx]);
+                const discrepancies = detectDiscrepancies(recA, recB);
                 matched.push({
                     recordA: recA,
-                    recordB: dataB[bestBIdx],
+                    recordB: recB,
                     score: bestScore,
                     label: getConfidenceLabel(bestScore),
                     discrepancies,
@@ -339,7 +397,13 @@ const AddressMatcher = (() => {
                     stateScore: bestResult ? bestResult.stateScore : 0,
                     cityScore: bestResult ? bestResult.cityScore : 0,
                     streetScore: bestResult ? bestResult.streetScore : 0,
-                    matchType: 'fuzzy'
+                    matchType: 'fuzzy',
+                    aiScore: calculateCompositeAIScore(recA, recB),
+                    aiScoreBreakdown: getAIScoreBreakdown(recA, recB),
+                    addressTypeA: detectAddressType(recA),
+                    addressTypeB: detectAddressType(recB),
+                    completenessA: calculateRecordCompleteness(recA),
+                    completenessB: calculateRecordCompleteness(recB)
                 });
             } else {
                 unmatchedA.push(recA);
@@ -354,6 +418,314 @@ const AddressMatcher = (() => {
         return { matched, unmatchedA, unmatchedB };
     }
 
+    // ─── AI Similarity Functions ────────────────────────────────────────────────
+
+    /**
+     * Split a standardized string into an array of tokens
+     */
+    function tokenize(str) {
+        const s = standardize(str);
+        return s ? s.split(/\s+/).filter(t => t.length > 0) : [];
+    }
+
+    /**
+     * Jaccard similarity on token sets: |intersection| / |union| (0-1)
+     */
+    function calculateJaccardSimilarity(a, b) {
+        const setA = new Set(tokenize(a));
+        const setB = new Set(tokenize(b));
+        if (setA.size === 0 && setB.size === 0) return 1;
+        if (setA.size === 0 || setB.size === 0) return 0;
+        let intersection = 0;
+        setA.forEach(t => { if (setB.has(t)) intersection++; });
+        const union = setA.size + setB.size - intersection;
+        return intersection / union;
+    }
+
+    /**
+     * TF-IDF-like cosine similarity between two token arrays (0-1)
+     */
+    function calculateCosineSimilarity(tokensA, tokensB) {
+        if (!tokensA.length && !tokensB.length) return 1;
+        if (!tokensA.length || !tokensB.length) return 0;
+
+        const freq = (tokens) => {
+            const map = {};
+            tokens.forEach(t => { map[t] = (map[t] || 0) + 1; });
+            return map;
+        };
+
+        const fA = freq(tokensA);
+        const fB = freq(tokensB);
+        const allTerms = new Set([...tokensA, ...tokensB]);
+
+        let dot = 0, normA = 0, normB = 0;
+        allTerms.forEach(t => {
+            const vA = fA[t] || 0;
+            const vB = fB[t] || 0;
+            dot += vA * vB;
+            normA += vA * vA;
+            normB += vB * vB;
+        });
+
+        const denom = Math.sqrt(normA) * Math.sqrt(normB);
+        return denom === 0 ? 0 : dot / denom;
+    }
+
+    /**
+     * Character n-gram overlap similarity: 2*|shared| / (|ngrams_a| + |ngrams_b|) (0-1)
+     */
+    function calculateNGramSimilarity(a, b, n) {
+        const size = n || 2;
+        const ngrams = (str) => {
+            const s = standardize(str).replace(/\s+/g, '');
+            const grams = [];
+            for (let i = 0; i <= s.length - size; i++) grams.push(s.substring(i, i + size));
+            return grams;
+        };
+        const gramsA = ngrams(a);
+        const gramsB = ngrams(b);
+        if (gramsA.length === 0 && gramsB.length === 0) return 1;
+        if (gramsA.length === 0 || gramsB.length === 0) return 0;
+        const setB = {};
+        gramsB.forEach(g => { setB[g] = (setB[g] || 0) + 1; });
+        let shared = 0;
+        gramsA.forEach(g => {
+            if (setB[g] > 0) { shared++; setB[g]--; }
+        });
+        return (2 * shared) / (gramsA.length + gramsB.length);
+    }
+
+    /**
+     * Standard 4-character Soundex code for a single word
+     */
+    function calculateSoundex(str) {
+        if (!str || typeof str !== 'string') return '0000';
+        const s = str.toUpperCase().replace(/[^A-Z]/g, '');
+        if (!s.length) return '0000';
+        let code = s[0];
+        let prev = SOUNDEX_MAP[s[0]] || 0;
+        for (let i = 1; i < s.length && code.length < 4; i++) {
+            const curr = SOUNDEX_MAP[s[i]] || 0;
+            if (curr && curr !== prev) { code += curr; }
+            prev = curr || prev;
+        }
+        return (code + '000').substring(0, 4);
+    }
+
+    /**
+     * Compare Soundex codes of the first tokens; returns 1 if match, 0 otherwise
+     */
+    function calculateSoundexMatch(a, b) {
+        const tokA = tokenize(a);
+        const tokB = tokenize(b);
+        if (!tokA.length || !tokB.length) return 0;
+        return calculateSoundex(tokA[0]) === calculateSoundex(tokB[0]) ? 1 : 0;
+    }
+
+    /**
+     * Damerau-Levenshtein distance (includes transpositions)
+     */
+    function calculateDamerauLevenshtein(a, b) {
+        if (a === b) return 0;
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        const lenA = a.length, lenB = b.length;
+        const d = Array.from({ length: lenA + 1 }, (_, i) =>
+            Array.from({ length: lenB + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0)
+        );
+        for (let i = 1; i <= lenA; i++) {
+            for (let j = 1; j <= lenB; j++) {
+                const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                d[i][j] = Math.min(
+                    d[i - 1][j] + 1,
+                    d[i][j - 1] + 1,
+                    d[i - 1][j - 1] + cost
+                );
+                if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+                    d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + cost);
+                }
+            }
+        }
+        return d[lenA][lenB];
+    }
+
+    /**
+     * Jaro-Winkler similarity (0-1)
+     */
+    function calculateJaroWinkler(a, b) {
+        if (a === b) return 1;
+        if (!a.length || !b.length) return 0;
+        const matchDist = Math.floor(Math.max(a.length, b.length) / 2) - 1;
+        const aMatches = new Array(a.length).fill(false);
+        const bMatches = new Array(b.length).fill(false);
+        let matches = 0, transpositions = 0;
+        for (let i = 0; i < a.length; i++) {
+            const start = Math.max(0, i - matchDist);
+            const end = Math.min(i + matchDist + 1, b.length);
+            for (let j = start; j < end; j++) {
+                if (bMatches[j] || a[i] !== b[j]) continue;
+                aMatches[i] = bMatches[j] = true;
+                matches++;
+                break;
+            }
+        }
+        if (matches === 0) return 0;
+        let k = 0;
+        for (let i = 0; i < a.length; i++) {
+            if (!aMatches[i]) continue;
+            while (!bMatches[k]) k++;
+            if (a[i] !== b[k]) transpositions++;
+            k++;
+        }
+        const jaro = (matches / a.length + matches / b.length + (matches - transpositions / 2) / matches) / 3;
+        let prefix = 0;
+        const maxPrefix = Math.min(4, Math.min(a.length, b.length));
+        while (prefix < maxPrefix && a[prefix] === b[prefix]) prefix++;
+        return jaro + prefix * 0.1 * (1 - jaro);
+    }
+
+    /**
+     * Haversine distance between two lat/lon points
+     * Returns { miles: number, score: number } where score is 100 at same point, 0 at 50+ miles
+     */
+    function calculateGeoProximity(latA, lonA, latB, lonB) {
+        const toRad = deg => deg * Math.PI / 180;
+        const R = 3958.8; // Earth radius in miles
+        const dLat = toRad(latB - latA);
+        const dLon = toRad(lonB - lonA);
+        const sinDLat = Math.sin(dLat / 2);
+        const sinDLon = Math.sin(dLon / 2);
+        const aVal = sinDLat * sinDLat + Math.cos(toRad(latA)) * Math.cos(toRad(latB)) * sinDLon * sinDLon;
+        const miles = 2 * R * Math.asin(Math.sqrt(aVal));
+        const score = Math.max(0, 100 - (miles / 50) * 100);
+        return { miles, score };
+    }
+
+    /**
+     * Detect address type from a record
+     * Returns 'residential', 'commercial', 'pobox', 'military', or 'unknown'
+     */
+    function detectAddressType(record) {
+        if (record.addressType) {
+            const t = String(record.addressType).toUpperCase().trim();
+            if (t === 'RESIDENTIAL' || t === 'R') return 'residential';
+            if (t === 'COMMERCIAL' || t === 'C' || t === 'BUSINESS') return 'commercial';
+            if (t === 'POBOX' || t === 'PO BOX' || t === 'P') return 'pobox';
+            if (t === 'MILITARY' || t === 'M') return 'military';
+        }
+        const street = standardize(record.street || '');
+        if (/\bPO\s*BOX\b/.test(street) || /\bPOBOX\b/.test(street)) return 'pobox';
+        if (/\b(APO|FPO|DPO)\b/.test(street)) return 'military';
+        if (/\b(STE|SUITE|DEPT|FL\s*\d|BLDG)\b/.test(street)) return 'commercial';
+        if (/\b(APT|UNIT|#\d)\b/.test(street)) return 'residential';
+        return 'unknown';
+    }
+
+    /**
+     * Calculate record completeness as a 0-100 percentage
+     * Fields: street, city, state, zip, address2, county, lat, lon,
+     *         zipPlus4, carrierRoute, deliveryPoint, congressionalDistrict, addressType, vacancy
+     */
+    function calculateRecordCompleteness(record) {
+        const fields = [
+            'street', 'city', 'state', 'zip', 'address2', 'county',
+            'lat', 'lon', 'zipPlus4', 'carrierRoute', 'deliveryPoint',
+            'congressionalDistrict', 'addressType', 'vacancy'
+        ];
+        const filled = fields.filter(f => {
+            const v = record[f];
+            return v !== undefined && v !== null && String(v).trim() !== '';
+        }).length;
+        return Math.round((filled / fields.length) * 100);
+    }
+
+    /**
+     * Percentage (0-100) of tokens in standardize(a) that appear in standardize(b)
+     */
+    function calculateTokenOverlap(a, b) {
+        const tokA = tokenize(a);
+        const tokB = new Set(tokenize(b));
+        if (tokA.length === 0) return tokB.size === 0 ? 100 : 0;
+        const hits = tokA.filter(t => tokB.has(t)).length;
+        return Math.round((hits / tokA.length) * 100);
+    }
+
+    /**
+     * Ensemble AI score (0-100) combining multiple similarity metrics on street fields.
+     * Weights: Jaccard 20%, Jaro-Winkler 25%, n-gram 20%, Soundex 10%,
+     *          token overlap 15%, Levenshtein-based 10%.
+     * If both records have lat/lon, geo proximity is blended in (replaces 5% from Levenshtein weight).
+     */
+    function calculateCompositeAIScore(recA, recB) {
+        const sA = standardize(recA.street || '');
+        const sB = standardize(recB.street || '');
+
+        const jaccard = calculateJaccardSimilarity(sA, sB) * 100;
+        const jw      = calculateJaroWinkler(sA, sB) * 100;
+        const ngram   = calculateNGramSimilarity(sA, sB, 2) * 100;
+        const soundex = calculateSoundexMatch(sA, sB) * 100;
+        const overlap = calculateTokenOverlap(sA, sB);
+        const maxLen  = Math.max(sA.length, sB.length);
+        const levSim  = maxLen === 0 ? 100 : (1 - calculateDamerauLevenshtein(sA, sB) / maxLen) * 100;
+
+        const hasGeo = recA.lat != null && recA.lon != null && recB.lat != null && recB.lon != null;
+
+        let score;
+        if (hasGeo) {
+            const geo = calculateGeoProximity(
+                parseFloat(recA.lat), parseFloat(recA.lon),
+                parseFloat(recB.lat), parseFloat(recB.lon)
+            ).score;
+            score = jaccard      * AI_WEIGHTS.jaccard +
+                    jw           * AI_WEIGHTS.jaroWinkler +
+                    ngram        * AI_WEIGHTS.nGram +
+                    soundex      * AI_WEIGHTS.soundex +
+                    overlap      * AI_WEIGHTS.tokenOverlap +
+                    levSim       * (AI_WEIGHTS.levenshtein / 2) +
+                    geo          * (AI_WEIGHTS.levenshtein / 2);
+        } else {
+            score = jaccard      * AI_WEIGHTS.jaccard +
+                    jw           * AI_WEIGHTS.jaroWinkler +
+                    ngram        * AI_WEIGHTS.nGram +
+                    soundex      * AI_WEIGHTS.soundex +
+                    overlap      * AI_WEIGHTS.tokenOverlap +
+                    levSim       * AI_WEIGHTS.levenshtein;
+        }
+
+        return Math.min(100, Math.max(0, Math.round(score)));
+    }
+
+    /**
+     * Returns a breakdown of all AI similarity scores (all values 0-100)
+     */
+    function getAIScoreBreakdown(recA, recB) {
+        const sA = standardize(recA.street || '');
+        const sB = standardize(recB.street || '');
+
+        const maxLen = Math.max(sA.length, sB.length);
+        const levSim = maxLen === 0 ? 100 : (1 - calculateDamerauLevenshtein(sA, sB) / maxLen) * 100;
+
+        const hasGeo = recA.lat != null && recA.lon != null && recB.lat != null && recB.lon != null;
+        const geoProximity = hasGeo
+            ? calculateGeoProximity(
+                parseFloat(recA.lat), parseFloat(recA.lon),
+                parseFloat(recB.lat), parseFloat(recB.lon)
+              ).score
+            : null;
+
+        return {
+            jaccard:        Math.round(calculateJaccardSimilarity(sA, sB) * 100),
+            jaroWinkler:    Math.round(calculateJaroWinkler(sA, sB) * 100),
+            nGram:          Math.round(calculateNGramSimilarity(sA, sB, 2) * 100),
+            soundex:        calculateSoundexMatch(sA, sB) * 100,
+            tokenOverlap:   calculateTokenOverlap(sA, sB),
+            levenshteinSim: Math.round(levSim),
+            geoProximity:   geoProximity !== null ? Math.round(geoProximity) : null,
+            composite:      calculateCompositeAIScore(recA, recB)
+        };
+    }
+
     return {
         standardize,
         stringSimilarity,
@@ -365,6 +737,20 @@ const AddressMatcher = (() => {
         getConfidenceBadgeClass,
         detectDiscrepancies,
         matchRecords,
-        VALID_STATES
+        VALID_STATES,
+        tokenize,
+        calculateJaccardSimilarity,
+        calculateCosineSimilarity,
+        calculateNGramSimilarity,
+        calculateSoundex,
+        calculateSoundexMatch,
+        calculateDamerauLevenshtein,
+        calculateJaroWinkler,
+        calculateGeoProximity,
+        detectAddressType,
+        calculateRecordCompleteness,
+        calculateTokenOverlap,
+        calculateCompositeAIScore,
+        getAIScoreBreakdown
     };
 })();
