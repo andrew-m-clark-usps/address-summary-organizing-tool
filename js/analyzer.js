@@ -5,6 +5,11 @@
 
 const DataAnalyzer = (() => {
 
+    const DATA_QUALITY_WEIGHTS = { completePct: 0.3, invalidZip: 0.15, duplicate: 0.15, avgCompleteness: 0.4 };
+    const SCORE_AGREEMENT_THRESHOLD = 70;
+    const AI_HIGH_THRESHOLD   = 80;
+    const AI_MEDIUM_THRESHOLD = 50;
+
     /**
      * Analyze address quality for a dataset
      */
@@ -24,6 +29,25 @@ const DataAnalyzer = (() => {
         let recordsWithSecondaryUnit = 0;
         let hasZipPlus4Count = 0;
         let standardizedStreetCount = 0;
+
+        // New counters
+        let recordsWithAddress2 = 0;
+        let recordsWithCounty = 0;
+        let recordsWithLatLon = 0;
+        let recordsWithCarrierRoute = 0;
+        let recordsWithDeliveryPoint = 0;
+        let recordsWithVacancy = 0;
+        let totalCompleteness = 0;
+        const addressTypeCounts = { residential: 0, commercial: 0, pobox: 0, military: 0, unknown: 0 };
+
+        // Extended field completeness counters
+        let presentAddress2 = 0;
+        let presentCounty = 0;
+        let presentLat = 0;
+        let presentLon = 0;
+        let presentZipPlus4 = 0;
+        let presentCarrierRoute = 0;
+        let presentDeliveryPoint = 0;
 
         const SECONDARY_UNIT_RE = /\b(APT|APARTMENT|STE|SUITE|UNIT|#)\b/i;
         const ZIP_PLUS4_RE = /^\d{5}-?\d{4}$/;
@@ -80,10 +104,55 @@ const DataAnalyzer = (() => {
                 const key = AddressMatcher.standardize(rec.street) + '|' + AddressMatcher.normalizeZip(rec.zip);
                 duplicates.set(key, (duplicates.get(key) || 0) + 1);
             }
+
+            // New field presence checks
+            if (rec.address2 && String(rec.address2).trim()) { recordsWithAddress2++; presentAddress2++; }
+            if (rec.county && String(rec.county).trim()) { recordsWithCounty++; presentCounty++; }
+            if (rec.lat != null && String(rec.lat).trim() !== '' &&
+                rec.lon != null && String(rec.lon).trim() !== '') {
+                recordsWithLatLon++;
+            }
+            if (rec.lat != null && String(rec.lat).trim() !== '') presentLat++;
+            if (rec.lon != null && String(rec.lon).trim() !== '') presentLon++;
+            if (rec.carrierRoute && String(rec.carrierRoute).trim()) { recordsWithCarrierRoute++; presentCarrierRoute++; }
+            if (rec.deliveryPoint && String(rec.deliveryPoint).trim()) { recordsWithDeliveryPoint++; presentDeliveryPoint++; }
+            if (rec.vacancy) { recordsWithVacancy++; }
+
+            // zipPlus4 field completeness (dedicated zipPlus4 field, not derived from zip)
+            if (rec.zipPlus4 && String(rec.zipPlus4).trim()) presentZipPlus4++;
+
+            // Address type distribution
+            const addrType = (typeof AddressMatcher.detectAddressType === 'function')
+                ? AddressMatcher.detectAddressType(rec)
+                : 'unknown';
+            const normalizedType = (addrType || 'unknown').toLowerCase();
+            if (normalizedType in addressTypeCounts) {
+                addressTypeCounts[normalizedType]++;
+            } else {
+                addressTypeCounts.unknown++;
+            }
+
+            // Record completeness
+            const completeness = (typeof AddressMatcher.calculateRecordCompleteness === 'function')
+                ? AddressMatcher.calculateRecordCompleteness(rec)
+                : (fieldsPopulated / 4) * 100;
+            totalCompleteness += completeness;
         });
 
         const duplicateCount = Array.from(duplicates.values()).filter(v => v > 1).reduce((sum, v) => sum + (v - 1), 0);
         const avgFieldsPopulated = total ? Math.round((totalFieldsPopulated / total) * 100) / 100 : 0;
+        const avgCompleteness = total ? Math.round((totalCompleteness / total) * 10) / 10 : 0;
+
+        const completePct   = total ? Math.round((completeCount / total) * 100) : 0;
+        const invalidZipPct = total ? Math.round((invalidZip / total) * 1000) / 10 : 0;
+        const duplicatePct  = total ? Math.round((duplicateCount / total) * 1000) / 10 : 0;
+
+        const dataQualityScore = Math.min(100, Math.max(0,
+            completePct   * DATA_QUALITY_WEIGHTS.completePct +
+            (100 - invalidZipPct) * DATA_QUALITY_WEIGHTS.invalidZip +
+            (100 - duplicatePct)  * DATA_QUALITY_WEIGHTS.duplicate +
+            avgCompleteness       * DATA_QUALITY_WEIGHTS.avgCompleteness
+        ));
 
         return {
             total,
@@ -97,26 +166,44 @@ const DataAnalyzer = (() => {
             invalidState,
             multiMissing,
             duplicates: duplicateCount,
-            completePct: total ? Math.round((completeCount / total) * 100) : 0,
+            completePct,
             fieldCompleteness: {
-                street: total ? Math.round(((total - missingStreet) / total) * 100) : 0,
-                city:   total ? Math.round(((total - missingCity)   / total) * 100) : 0,
-                state:  total ? Math.round(((total - missingState)  / total) * 100) : 0,
-                zip:    total ? Math.round(((total - missingZip)    / total) * 100) : 0
+                street:        total ? Math.round(((total - missingStreet) / total) * 100) : 0,
+                city:          total ? Math.round(((total - missingCity)   / total) * 100) : 0,
+                state:         total ? Math.round(((total - missingState)  / total) * 100) : 0,
+                zip:           total ? Math.round(((total - missingZip)    / total) * 100) : 0,
+                address2:      total ? Math.round((presentAddress2      / total) * 100) : 0,
+                county:        total ? Math.round((presentCounty        / total) * 100) : 0,
+                lat:           total ? Math.round((presentLat           / total) * 100) : 0,
+                lon:           total ? Math.round((presentLon           / total) * 100) : 0,
+                zipPlus4:      total ? Math.round((presentZipPlus4      / total) * 100) : 0,
+                carrierRoute:  total ? Math.round((presentCarrierRoute  / total) * 100) : 0,
+                deliveryPoint: total ? Math.round((presentDeliveryPoint / total) * 100) : 0
             },
             // New percentage fields
             missingStreetPct:     total ? Math.round((missingStreet / total) * 1000) / 10 : 0,
             missingCityPct:       total ? Math.round((missingCity   / total) * 1000) / 10 : 0,
             missingStatePct:      total ? Math.round((missingState  / total) * 1000) / 10 : 0,
             missingZipPct:        total ? Math.round((missingZip    / total) * 1000) / 10 : 0,
-            invalidZipPct:        total ? Math.round((invalidZip    / total) * 1000) / 10 : 0,
+            invalidZipPct,
             invalidStatePct:      total ? Math.round((invalidState  / total) * 1000) / 10 : 0,
-            duplicatePct:         total ? Math.round((duplicateCount / total) * 1000) / 10 : 0,
+            duplicatePct,
             avgFieldsPopulated,
             recordsWithAllFourFields,
             recordsWithSecondaryUnit,
             hasZipPlus4Count,
-            standardizedStreetPct: total ? Math.round((standardizedStreetCount / total) * 100) : 0
+            recordsWithZipPlus4: hasZipPlus4Count,
+            standardizedStreetPct: total ? Math.round((standardizedStreetCount / total) * 100) : 0,
+            // New enriched fields
+            recordsWithAddress2,
+            recordsWithCounty,
+            recordsWithLatLon,
+            recordsWithCarrierRoute,
+            recordsWithDeliveryPoint,
+            recordsWithVacancy,
+            addressTypeCounts,
+            avgCompleteness,
+            dataQualityScore: Math.round(dataQualityScore * 10) / 10
         };
     }
 
@@ -537,6 +624,325 @@ const DataAnalyzer = (() => {
     }
 
     /**
+     * Compute detailed AI/ML scoring metrics from match results
+     */
+    function analyzeAIMetrics(matchResults) {
+        const matched = (matchResults && matchResults.matched) ? matchResults.matched : [];
+        const n = matched.length;
+
+        if (n === 0) {
+            return {
+                avgAIScore: 0, aiScoreHistogram: new Array(20).fill(0),
+                avgJaccard: 0, avgJaroWinkler: 0, avgNGram: 0, avgSoundex: 0,
+                avgTokenOverlap: 0, avgLevenshteinSim: 0, avgGeoProximity: 0,
+                aiVsTraditionalCorrelation: 0, scoreAgreementRate: 0,
+                aiHighCount: 0, aiMediumCount: 0, aiLowCount: 0,
+                aiConfidenceDistribution: { high: 0, medium: 0, low: 0 },
+                f1Equivalent: 0
+            };
+        }
+
+        // Average AI score
+        let totalAI = 0;
+        matched.forEach(m => { totalAI += (m.aiScore || 0); });
+        const avgAIScore = Math.round((totalAI / n) * 10) / 10;
+
+        // 20-bucket histogram (0-4, 5-9, ..., 95-100)
+        const aiScoreHistogram = new Array(20).fill(0);
+        matched.forEach(m => {
+            const score = m.aiScore || 0;
+            const bucket = Math.min(19, Math.floor(score / 5));
+            aiScoreHistogram[bucket]++;
+        });
+
+        // Breakdown averages (from aiScoreBreakdown)
+        let sumJaccard = 0, sumJaro = 0, sumNGram = 0, sumSoundex = 0;
+        let sumToken = 0, sumLevenshtein = 0, sumGeoProx = 0;
+        matched.forEach(m => {
+            const bd = m.aiScoreBreakdown || {};
+            sumJaccard      += bd.jaccard          || 0;
+            sumJaro         += bd.jaroWinkler       || 0;
+            sumNGram        += bd.nGram             || 0;
+            sumSoundex      += bd.soundex           || 0;
+            sumToken        += bd.tokenOverlap      || 0;
+            sumLevenshtein  += bd.levenshteinSim    || 0;
+            sumGeoProx      += bd.geoProximity      || 0;
+        });
+        const avgJaccard        = Math.round((sumJaccard     / n) * 1000) / 1000;
+        const avgJaroWinkler    = Math.round((sumJaro        / n) * 1000) / 1000;
+        const avgNGram          = Math.round((sumNGram       / n) * 1000) / 1000;
+        const avgSoundex        = Math.round((sumSoundex     / n) * 1000) / 1000;
+        const avgTokenOverlap   = Math.round((sumToken       / n) * 1000) / 1000;
+        const avgLevenshteinSim = Math.round((sumLevenshtein / n) * 1000) / 1000;
+        const avgGeoProximity   = Math.round((sumGeoProx     / n) * 1000) / 1000;
+
+        // Pearson correlation between aiScore and traditional score
+        let aiVsTraditionalCorrelation = 0;
+        if (n >= 2) {
+            const aiScores   = matched.map(m => m.aiScore || 0);
+            const tradScores = matched.map(m => m.score   || 0);
+            const meanAI   = aiScores.reduce((a, b) => a + b, 0) / n;
+            const meanTrad = tradScores.reduce((a, b) => a + b, 0) / n;
+            let cov = 0, varAI = 0, varTrad = 0;
+            for (let i = 0; i < n; i++) {
+                const dA = aiScores[i]   - meanAI;
+                const dT = tradScores[i] - meanTrad;
+                cov     += dA * dT;
+                varAI   += dA * dA;
+                varTrad += dT * dT;
+            }
+            const denom = Math.sqrt(varAI * varTrad);
+            aiVsTraditionalCorrelation = denom > 0 ? Math.round((cov / denom) * 1000) / 1000 : 0;
+        }
+
+        // Agreement rate: both >= threshold OR both < threshold
+        let agreementCount = 0;
+        matched.forEach(m => {
+            const ai   = m.aiScore || 0;
+            const trad = m.score   || 0;
+            if ((ai >= SCORE_AGREEMENT_THRESHOLD && trad >= SCORE_AGREEMENT_THRESHOLD) ||
+                (ai < SCORE_AGREEMENT_THRESHOLD && trad < SCORE_AGREEMENT_THRESHOLD)) agreementCount++;
+        });
+        const scoreAgreementRate = Math.round((agreementCount / n) * 1000) / 10;
+
+        // Confidence buckets
+        const aiHighCount   = matched.filter(m => (m.aiScore || 0) >= AI_HIGH_THRESHOLD).length;
+        const aiMediumCount = matched.filter(m => (m.aiScore || 0) >= AI_MEDIUM_THRESHOLD && (m.aiScore || 0) < AI_HIGH_THRESHOLD).length;
+        const aiLowCount    = matched.filter(m => (m.aiScore || 0) < AI_MEDIUM_THRESHOLD).length;
+
+        const aiConfidenceDistribution = { high: aiHighCount, medium: aiMediumCount, low: aiLowCount };
+
+        // F1 equivalent
+        const aiHighPct     = (aiHighCount / n) * 100;
+        const agreementRate = scoreAgreementRate;
+        let f1Equivalent = 0;
+        const f1Denom = (aiHighPct / 100) + (agreementRate / 100);
+        if (f1Denom > 0) {
+            f1Equivalent = Math.round(
+                (2 * (aiHighPct / 100) * (agreementRate / 100)) / f1Denom * 1000
+            ) / 10;
+        }
+
+        return {
+            avgAIScore,
+            aiScoreHistogram,
+            avgJaccard,
+            avgJaroWinkler,
+            avgNGram,
+            avgSoundex,
+            avgTokenOverlap,
+            avgLevenshteinSim,
+            avgGeoProximity,
+            aiVsTraditionalCorrelation,
+            scoreAgreementRate,
+            aiHighCount,
+            aiMediumCount,
+            aiLowCount,
+            aiConfidenceDistribution,
+            f1Equivalent
+        };
+    }
+
+    /**
+     * Analyze geographic distance metrics from match results
+     */
+    function analyzeGeoMetrics(matchResults) {
+        const matched = (matchResults && matchResults.matched) ? matchResults.matched : [];
+
+        const withGeo = matched.filter(m => typeof m.geoDistance === 'number');
+        const matchesWithGeoData = withGeo.length;
+
+        if (matchesWithGeoData === 0) {
+            return {
+                avgGeoDistance: 0,
+                matchesWithin_01mi: 0,
+                matchesWithin_1mi: 0,
+                matchesWithin_5mi: 0,
+                matchesBeyond_10mi: 0,
+                geoMismatchRate: 0,
+                matchesWithGeoData: 0
+            };
+        }
+
+        let totalDist = 0;
+        let within01 = 0, within1 = 0, within5 = 0, beyond10 = 0, beyond5 = 0;
+
+        withGeo.forEach(m => {
+            const d = m.geoDistance;
+            totalDist += d;
+            if (d < 0.1)  within01++;
+            if (d < 1)    within1++;
+            if (d < 5)    within5++;
+            if (d >= 10)  beyond10++;
+            if (d > 5)    beyond5++;
+        });
+
+        const avgGeoDistance  = Math.round((totalDist / matchesWithGeoData) * 1000) / 1000;
+        const geoMismatchRate = Math.round((beyond5 / matchesWithGeoData) * 1000) / 10;
+
+        return {
+            avgGeoDistance,
+            matchesWithin_01mi:   within01,
+            matchesWithin_1mi:    within1,
+            matchesWithin_5mi:    within5,
+            matchesBeyond_10mi:   beyond10,
+            geoMismatchRate,
+            matchesWithGeoData
+        };
+    }
+
+    /**
+     * Analyze address type distribution and match rates
+     */
+    function analyzeAddressTypeMetrics(matchResults) {
+        const matched   = (matchResults && matchResults.matched)   ? matchResults.matched   : [];
+        const unmatchedA = (matchResults && matchResults.unmatchedA) ? matchResults.unmatchedA : [];
+
+        const types = ['residential', 'commercial', 'pobox', 'military', 'unknown'];
+        const totals   = {};
+        const matchedByType = {};
+        types.forEach(t => { totals[t] = 0; matchedByType[t] = 0; });
+
+        // Count totals from matched recordA + unmatchedA
+        const allA = matched.map(m => m.recordA).concat(unmatchedA);
+        allA.forEach(rec => {
+            const type = (typeof AddressMatcher.detectAddressType === 'function')
+                ? (AddressMatcher.detectAddressType(rec) || 'unknown').toLowerCase()
+                : 'unknown';
+            const key = types.includes(type) ? type : 'unknown';
+            totals[key]++;
+        });
+
+        // Count matched by type
+        let typeMismatchCount = 0;
+        matched.forEach(m => {
+            const typeA = (typeof AddressMatcher.detectAddressType === 'function')
+                ? (AddressMatcher.detectAddressType(m.recordA) || 'unknown').toLowerCase()
+                : 'unknown';
+            const typeB = (typeof AddressMatcher.detectAddressType === 'function')
+                ? (AddressMatcher.detectAddressType(m.recordB) || 'unknown').toLowerCase()
+                : 'unknown';
+            const keyA = types.includes(typeA) ? typeA : 'unknown';
+            matchedByType[keyA]++;
+            if (typeA !== typeB) typeMismatchCount++;
+        });
+
+        const matchRateByType = {};
+        types.forEach(t => {
+            const total   = totals[t];
+            const matchedN = matchedByType[t];
+            matchRateByType[t] = {
+                matched: matchedN,
+                total,
+                rate: total > 0 ? Math.round((matchedN / total) * 1000) / 10 : 0
+            };
+        });
+
+        const typeMismatchRate = matched.length > 0
+            ? Math.round((typeMismatchCount / matched.length) * 1000) / 10
+            : 0;
+
+        return { matchRateByType, typeMismatchCount, typeMismatchRate };
+    }
+
+    /**
+     * Analyze which scoring fields contribute most to match scores
+     */
+    function analyzeFieldContribution(matchResults) {
+        const matched = (matchResults && matchResults.matched) ? matchResults.matched : [];
+        const n = matched.length;
+
+        const fields = ['street', 'city', 'state', 'zip'];
+        const scoreKey = { street: 'streetScore', city: 'cityScore', state: 'stateScore', zip: 'zipScore' };
+
+        if (n === 0) {
+            return {
+                fieldImportance: fields.map(f => ({ field: f, avgComponentScore: 0, matchCountAbove70: 0 })),
+                topContributingField: 'street'
+            };
+        }
+
+        const fieldImportance = fields.map(field => {
+            const key = scoreKey[field];
+            let total = 0;
+            let above70 = 0;
+            matched.forEach(m => {
+                const s = m[key] || 0;
+                total += s;
+                if (s >= 70) above70++;
+            });
+            return {
+                field,
+                avgComponentScore: Math.round((total / n) * 10) / 10,
+                matchCountAbove70: above70
+            };
+        }).sort((a, b) => b.avgComponentScore - a.avgComponentScore);
+
+        const topContributingField = fieldImportance[0] ? fieldImportance[0].field : 'street';
+
+        return { fieldImportance, topContributingField };
+    }
+
+    /**
+     * Analyze patterns in address discrepancies across matched records
+     */
+    function analyzeDiscrepancyPatterns(matchResults) {
+        const matched = (matchResults && matchResults.matched) ? matchResults.matched : [];
+
+        const comboMap = {};
+        let totalDiscrepancies = 0;
+        let noDiscrepancies = 0;
+        let multipleDiscrepancies = 0;
+        const discrepancyTotals = {};
+
+        matched.forEach(m => {
+            const discs = m.discrepancies || [];
+            const count = discs.length;
+            totalDiscrepancies += count;
+            if (count === 0) noDiscrepancies++;
+            if (count >= 2)  multipleDiscrepancies++;
+
+            // Individual discrepancy type counts
+            discs.forEach(d => {
+                discrepancyTotals[d] = (discrepancyTotals[d] || 0) + 1;
+            });
+
+            // Combo string (sorted for determinism)
+            if (count > 0) {
+                const combo = [...discs].sort().join(' + ');
+                comboMap[combo] = (comboMap[combo] || 0) + 1;
+            }
+        });
+
+        // Top 10 combos
+        const comboFrequency = Object.fromEntries(
+            Object.entries(comboMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10)
+        );
+
+        // Most common single discrepancy
+        let mostCommonDiscrepancy = null;
+        let maxCount = 0;
+        Object.entries(discrepancyTotals).forEach(([d, cnt]) => {
+            if (cnt > maxCount) { maxCount = cnt; mostCommonDiscrepancy = d; }
+        });
+
+        const n = matched.length;
+        const avgDiscrepancySeverity = n > 0
+            ? Math.round((totalDiscrepancies / n) * 100) / 100
+            : 0;
+
+        return {
+            comboFrequency,
+            avgDiscrepancySeverity,
+            mostCommonDiscrepancy,
+            recordsWithNoDiscrepancies: noDiscrepancies,
+            recordsWithMultipleDiscrepancies: multipleDiscrepancies
+        };
+    }
+
+    /**
      * Run the full analysis
      * @param {Array} dataA
      * @param {Array} dataB
@@ -557,6 +963,11 @@ const DataAnalyzer = (() => {
         const cities        = citiesComparison(dataA, dataB);
         const matchDetails  = analyzeMatchDetails(matchResults);
         const aiMetrics     = computeAIMetrics(matchResults, dataA, dataB, qualityA, qualityB, processingMs);
+        const extendedAIMetrics  = analyzeAIMetrics(matchResults);
+        const geoMetrics         = analyzeGeoMetrics(matchResults);
+        const addressTypes       = analyzeAddressTypeMetrics(matchResults);
+        const fieldContribution  = analyzeFieldContribution(matchResults);
+        const discrepancyPatterns = analyzeDiscrepancyPatterns(matchResults);
 
         return {
             summary,
@@ -564,7 +975,12 @@ const DataAnalyzer = (() => {
             geo: { stateA, stateB, cityA, cityB, zipA, zipB, geoMatch },
             cities,
             matchDetails,
-            aiMetrics
+            aiMetrics,
+            extendedAIMetrics,
+            geoMetrics,
+            addressTypes,
+            fieldContribution,
+            discrepancyPatterns
         };
     }
 
@@ -578,6 +994,11 @@ const DataAnalyzer = (() => {
         citiesComparison,
         analyzeMatchDetails,
         computeAIMetrics,
+        analyzeAIMetrics,
+        analyzeGeoMetrics,
+        analyzeAddressTypeMetrics,
+        analyzeFieldContribution,
+        analyzeDiscrepancyPatterns,
         runFullAnalysis
     };
 })();
