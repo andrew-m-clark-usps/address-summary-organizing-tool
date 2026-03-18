@@ -52,6 +52,51 @@ Export a complete, professionally formatted **11-slide PowerPoint (.pptx)** pres
 
 ---
 
+## 🐳 Docker
+
+### Quick Start
+```bash
+# Production mode — Nginx serving static site
+docker compose up static-site --build -d
+# → http://localhost:8080
+
+# Development mode — live reload on file changes
+docker compose up dev --build
+# → http://localhost:3000
+
+# Stop all
+docker compose down
+```
+
+### Using Convenience Scripts
+```bash
+# Linux/macOS
+./scripts/docker-run.sh static    # Production Nginx on :8080
+./scripts/docker-run.sh dev       # Dev server with live reload on :3000
+./scripts/docker-run.sh stop      # Stop all containers
+
+# Windows PowerShell
+.\scripts\docker-run.ps1 -Mode static
+.\scripts\docker-run.ps1 -Mode dev
+.\scripts\docker-run.ps1 -Mode stop
+```
+
+### Building Standalone Image
+```bash
+docker build -t address-tool .
+docker run -p 8080:80 address-tool
+```
+
+### Services Overview
+
+| Service | Port | Purpose | Command |
+|---------|------|---------|---------|
+| `static-site` | 8080 | Production Nginx container | `docker compose up static-site` |
+| `dev` | 3000 | Dev server with live file watching | `docker compose up dev` |
+| `react-dev` | 3001 | React app dev server | `docker compose --profile react up react-dev` |
+
+---
+
 ## Quick Start (Local / Offline Use)
 
 1. Download or clone this repository
@@ -144,14 +189,22 @@ All libraries load from CDN. No build step required.
 
 ```
 /
+├── Dockerfile                    Production Nginx container
+├── docker-compose.yml            Multi-service Docker orchestration
+├── .dockerignore                 Docker build exclusions
 ├── index.html                    Main single-page application
 ├── css/
 │   └── styles.css                Dark-theme professional styling
+├── docker/
+│   ├── nginx.conf                Custom Nginx config (security headers, gzip, SPA routing)
+│   └── Dockerfile.dev            Dev server with live reload
 ├── js/
 │   ├── app.js                    Core logic, CSV/PPTX export, UI state
 │   ├── matcher.js                Address matching engine (exact + fuzzy)
 │   ├── analyzer.js               Data analysis functions
 │   └── visualizations.js        Chart.js chart rendering (9 charts)
+├── react-app/
+│   └── Dockerfile                React dev container
 ├── samples/
 │   ├── sample_system_a.csv       30 sample System A records
 │   └── sample_system_b.csv       30 sample System B records
@@ -162,9 +215,12 @@ All libraries load from CDN. No build step required.
 │   └── README.md                 Infrastructure deployment guide
 ├── scripts/
 │   ├── deploy.sh                 Linux/macOS deploy script
-│   └── deploy.ps1                Windows PowerShell deploy script
+│   ├── deploy.ps1                Windows PowerShell deploy script
+│   ├── docker-run.sh             Docker convenience script (Linux/macOS)
+│   └── docker-run.ps1            Docker convenience script (Windows)
 └── .github/workflows/
-    └── deploy.yml                GitHub Actions CI/CD pipeline
+    ├── deploy.yml                GitHub Actions CI/CD pipeline (AWS)
+    └── docker.yml                GitHub Actions Docker build & test pipeline
 ```
 
 ---

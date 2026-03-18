@@ -1,0 +1,10 @@
+node_modules
+.git
+.github
+infrastructure
+react-app/node_modules
+react-app/build
+*.md
+*.ps1
+*.bat
+.env*
