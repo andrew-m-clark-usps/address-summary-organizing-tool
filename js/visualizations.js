@@ -7,18 +7,18 @@ const Visualizations = (() => {
 
     // Color palette (matches CSS variables)
     const COLORS = {
-        perfect:  '#10B981',
-        high:     '#84CC16',
-        partial:  '#F59E0B',
-        low:      '#F97316',
-        none:     '#EF4444',
-        systemA:  '#3B82F6',
-        systemB:  '#8B5CF6',
-        complete: '#10B981',
-        incomplete: '#F59E0B',
-        matched:  '#10B981',
-        unmatchedA: '#3B82F6',
-        unmatchedB: '#8B5CF6'
+        perfect:  '#059669',
+        high:     '#65A30D',
+        partial:  '#D97706',
+        low:      '#EA580C',
+        none:     '#DC2626',
+        systemA:  '#2563EB',
+        systemB:  '#D97706',
+        complete: '#059669',
+        incomplete: '#D97706',
+        matched:  '#059669',
+        unmatchedA: '#2563EB',
+        unmatchedB: '#D97706'
     };
 
     const ALPHA = (hex, a) => hex + Math.round(a * 255).toString(16).padStart(2, '0');
@@ -31,9 +31,9 @@ const Visualizations = (() => {
         size: 12
     };
 
-    const defaultGridColor = 'rgba(51,65,85,0.6)';
-    const defaultTickColor = '#94A3B8';
-    const defaultTextColor = '#F1F5F9';
+    const defaultGridColor = 'rgba(229,231,235,0.8)';
+    const defaultTickColor = '#6B7280';
+    const defaultTextColor = '#1F2937';
 
     Chart.defaults.color = defaultTickColor;
     Chart.defaults.font = defaultFont;
@@ -72,7 +72,7 @@ const Visualizations = (() => {
                 datasets: [{
                     data,
                     backgroundColor: [COLORS.perfect, COLORS.high, COLORS.partial, COLORS.low, COLORS.none],
-                    borderColor: '#1E293B',
+                    borderColor: '#FFFFFF',
                     borderWidth: 2,
                     hoverOffset: 8
                 }]
@@ -327,7 +327,7 @@ const Visualizations = (() => {
                 datasets: [{
                     data,
                     backgroundColor: [COLORS.complete, ALPHA(COLORS.low, 0.9), ALPHA(COLORS.partial, 0.9), ALPHA(COLORS.none, 0.7), COLORS.none],
-                    borderColor: '#1E293B',
+                    borderColor: '#FFFFFF',
                     borderWidth: 2,
                     hoverOffset: 6
                 }]
@@ -428,7 +428,7 @@ const Visualizations = (() => {
                 datasets: [{
                     data: data.length ? data : [1],
                     backgroundColor: data.length ? bgColors.slice(0, labels.length) : [COLORS.perfect],
-                    borderColor: '#1E293B',
+                    borderColor: '#FFFFFF',
                     borderWidth: 2,
                     hoverOffset: 6
                 }]
