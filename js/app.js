@@ -15,7 +15,7 @@ const App = (() => {
         matchedPage: 1,
         unmatchedAPage: 1,
         unmatchedBPage: 1,
-        matchedFilter: { search: '', confidence: 'all', state: '' },
+        matchedFilter: { search: '', confidence: 'all', state: '', aiScore: '', addressType: '' },
         matchedSort: { col: 'score', dir: 'desc' },
         threshold: 70,
         weights: { zip: 40, state: 30, city: 20, street: 10 }
