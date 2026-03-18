@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 const STREET_FIELDS = ['address', 'street', 'street address', 'address line 1', 'addr', 'street_address', 'streetaddress'];
 const CITY_FIELDS   = ['city', 'town', 'municipality'];
@@ -51,17 +51,47 @@ export function parseCSV(file) {
 export function parseExcel(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
-                const wb = XLSX.read(e.target.result, { type: 'binary' });
-                const sheetName = wb.SheetNames[0];
-                const sheet = wb.Sheets[sheetName];
-                const raw = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-                if (!raw || raw.length === 0) {
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(e.target.result);
+
+                const worksheet = workbook.worksheets[0];
+                if (!worksheet) {
+                    reject(new Error('No worksheet found in Excel file.'));
+                    return;
+                }
+
+                // Read headers from the first non-empty row
+                const headers = [];
+                const headerRow = worksheet.getRow(1);
+                headerRow.eachCell({ includeEmpty: false }, (cell) => {
+                    headers.push(String(cell.value !== null && cell.value !== undefined ? cell.value : ''));
+                });
+
+                if (headers.length === 0) {
                     reject(new Error('No data found in Excel file.'));
                     return;
                 }
-                const headers = raw.length > 0 ? Object.keys(raw[0]) : [];
+
+                // Read data rows
+                const raw = [];
+                worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+                    if (rowNumber === 1) return; // skip header
+                    const rowObj = {};
+                    headers.forEach((header, i) => {
+                        const cell = row.getCell(i + 1);
+                        const val = cell.value;
+                        rowObj[header] = val !== null && val !== undefined ? String(val) : '';
+                    });
+                    raw.push(rowObj);
+                });
+
+                if (raw.length === 0) {
+                    reject(new Error('No data found in Excel file.'));
+                    return;
+                }
+
                 const records = raw.map(row => normalizeRecord(row, headers));
                 resolve({ records, headers, raw });
             } catch (err) {
@@ -69,7 +99,7 @@ export function parseExcel(file) {
             }
         };
         reader.onerror = () => reject(new Error('File read error.'));
-        reader.readAsBinaryString(file);
+        reader.readAsArrayBuffer(file);
     });
 }
 
