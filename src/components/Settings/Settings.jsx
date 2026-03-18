@@ -1,79 +1,154 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { Icon } from '../Icons';
+import { clearAddresses } from '../../services/addressService';
+import { PORTAL_CONFIG } from '../../utils/constants';
+
+const Section = ({ title, icon, children }) => (
+  <div className="card" style={{ marginBottom: 16 }}>
+    <div className="card-header">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon name={icon} size={15} color="var(--navy-mid)" />
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--gray-900)' }}>{title}</span>
+      </div>
+    </div>
+    <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>{children}</div>
+  </div>
+);
+
+const Row = ({ label, hint, children }) => (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '11px 0', borderBottom: '1px solid var(--gray-100)',
+  }}>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--gray-700)' }}>{label}</div>
+      {hint && <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 2 }}>{hint}</div>}
+    </div>
+    <div style={{ flexShrink: 0 }}>{children}</div>
+  </div>
+);
 
 export const Settings = () => {
   const { session } = useAuth();
-  const [pageSize, setPageSize] = useState('50');
-  const [theme, setTheme] = useState('light');
-  const [saved, setSaved] = useState(false);
+  const [pageSize, setPageSize]     = useState('50');
+  const [threshold, setThreshold]   = useState(70);
+  const [batchSize, setBatchSize]   = useState('1000');
+  const [exportFmt, setExportFmt]   = useState('csv');
+  const [saved, setSaved]           = useState(false);
+  const [cleared, setCleared]       = useState(false);
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const handleSave = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
-  const Section = ({ title, children }) => (
-    <div style={{ background: 'white', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24, marginBottom: 20 }}>
-      <h3 style={{ margin: '0 0 20px', color: '#1B3A6B', fontSize: 16, paddingBottom: 12, borderBottom: '1px solid #e5e7eb' }}>{title}</h3>
-      {children}
-    </div>
-  );
+  const handleClear = async () => {
+    if (!window.confirm('Clear all your stored address records? This cannot be undone.')) return;
+    await clearAddresses();
+    setCleared(true);
+    setTimeout(() => setCleared(false), 2000);
+  };
 
-  const Field = ({ label, children }) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f5f5f5' }}>
-      <label style={{ fontWeight: 500, color: '#333', fontSize: 14 }}>{label}</label>
-      {children}
-    </div>
+  const sel = (val, onChange, options) => (
+    <select
+      className="form-input form-select"
+      value={val}
+      onChange={e => onChange(e.target.value)}
+      style={{ width: 140, fontSize: 13 }}
+    >
+      {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+    </select>
   );
 
   return (
-    <div>
-      <h2 style={{ color: '#1B3A6B', marginBottom: 24 }}>Settings</h2>
-      
-      <Section title="Account Settings">
-        <Field label="Username"><span style={{ color: '#555', fontSize: 14 }}>{session?.username || 'admin'}</span></Field>
-        <Field label="Display Name"><input defaultValue={session?.name || 'John D.'} style={{ padding: '6px 12px', border: '1px solid #ddd', borderRadius: 6, fontSize: 14 }} /></Field>
-        <Field label="Role"><span style={{ background: '#e8f0fe', color: '#004B87', padding: '4px 12px', borderRadius: 12, fontSize: 13, fontWeight: 600 }}>Administrator</span></Field>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--gray-900)' }}>Settings</h1>
+        <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 3 }}>
+          Configure your portal preferences and account options.
+        </p>
+      </div>
+
+      <Section title="Account" icon="user">
+        <Row label="Username">
+          <span style={{ fontSize: 13, color: 'var(--gray-500)', fontFamily: 'monospace' }}>
+            {session?.username || 'admin'}
+          </span>
+        </Row>
+        <Row label="Display Name">
+          <input
+            className="form-input"
+            defaultValue={session?.name || 'John D.'}
+            style={{ width: 180, fontSize: 13 }}
+          />
+        </Row>
+        <Row label="Email" hint="Used in the portal nav bar">
+          <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>
+            {session?.email || PORTAL_CONFIG.userEmail}
+          </span>
+        </Row>
+        <Row label="Role">
+          <span className="badge badge-navy" style={{ fontSize: 12 }}>Administrator</span>
+        </Row>
+        <Row label="Region">
+          <span className="badge badge-outline" style={{ fontSize: 12 }}>{PORTAL_CONFIG.region}</span>
+        </Row>
       </Section>
-      
-      <Section title="Display Preferences">
-        <Field label="Records per page">
-          <select value={pageSize} onChange={e=>setPageSize(e.target.value)} style={{ padding: '6px 12px', border: '1px solid #ddd', borderRadius: 6, fontSize: 14 }}>
-            {['25','50','100','200'].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </Field>
-        <Field label="Theme">
-          <select value={theme} onChange={e=>setTheme(e.target.value)} style={{ padding: '6px 12px', border: '1px solid #ddd', borderRadius: 6, fontSize: 14 }}>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </Field>
+
+      <Section title="Display Preferences" icon="eye">
+        <Row label="Records per page" hint="Applied to address tables">
+          {sel(pageSize, setPageSize, [
+            {v:'25',l:'25'},{v:'50',l:'50'},{v:'100',l:'100'},{v:'200',l:'200'},
+          ])}
+        </Row>
+        <Row label="Default export format">
+          {sel(exportFmt, setExportFmt, [
+            {v:'csv',l:'CSV'},{v:'xlsx',l:'Excel (XLSX)'},
+          ])}
+        </Row>
       </Section>
-      
-      <Section title="Data Management">
-        <Field label="Default Export Format">
-          <select defaultValue="csv" style={{ padding: '6px 12px', border: '1px solid #ddd', borderRadius: 6, fontSize: 14 }}>
-            <option value="csv">CSV</option>
-            <option value="xlsx">Excel</option>
-          </select>
-        </Field>
-        <Field label="Batch Processing Size">
-          <select defaultValue="1000" style={{ padding: '6px 12px', border: '1px solid #ddd', borderRadius: 6, fontSize: 14 }}>
-            {['500','1000','5000','10000'].map(n => <option key={n} value={n}>{n} records</option>)}
-          </select>
-        </Field>
+
+      <Section title="Data & Processing" icon="settings">
+        <Row label="Batch processing size" hint="Records per chunk for large file imports">
+          {sel(batchSize, setBatchSize, [
+            {v:'500',l:'500 records'},{v:'1000',l:'1,000 records'},
+            {v:'5000',l:'5,000 records'},{v:'10000',l:'10,000 records'},
+          ])}
+        </Row>
+        <Row label="Match confidence threshold" hint={`Current: ${threshold}%`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="range" min={50} max={100} value={threshold}
+              onChange={e => setThreshold(Number(e.target.value))}
+              style={{ width: 120 }}
+            />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy-mid)', width: 36 }}>
+              {threshold}%
+            </span>
+          </div>
+        </Row>
       </Section>
-      
-      <Section title="System Configuration">
-        <Field label="Match Confidence Threshold">
-          <input type="range" min="50" max="100" defaultValue="70" style={{ width: 150 }} /> 
-          <span style={{ marginLeft: 8, fontSize: 14, color: '#555' }}>70%</span>
-        </Field>
-        <Field label="IndexedDB Storage">
-          <button style={{ background: '#fee', color: '#E31837', border: '1px solid #E31837', borderRadius: 6, padding: '5px 14px', cursor: 'pointer', fontSize: 13 }}>Clear Cache</button>
-        </Field>
+
+      <Section title="Storage" icon="inbox">
+        <Row label="Address records" hint="Stored in your browser's IndexedDB — only you can see your records">
+          <button
+            className="btn btn-sm btn-red"
+            onClick={handleClear}
+            style={{ fontSize: 12 }}
+          >
+            <Icon name="trash" size={12} />
+            {cleared ? 'Cleared' : 'Clear My Data'}
+          </button>
+        </Row>
       </Section>
-      
-      <button onClick={handleSave} style={{ background: saved?'#28A745':'#004B87', color: 'white', border: 'none', borderRadius: 6, padding: '10px 28px', cursor: 'pointer', fontSize: 15, fontWeight: 600, transition: 'background 0.3s' }}>
-        {saved ? '✓ Saved!' : 'Save Settings'}
-      </button>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+        <button className="btn btn-blue" onClick={handleSave} style={{ fontSize: 13, minWidth: 120 }}>
+          <Icon name="save" size={14} />
+          {saved ? 'Saved!' : 'Save Settings'}
+        </button>
+      </div>
     </div>
   );
 };
