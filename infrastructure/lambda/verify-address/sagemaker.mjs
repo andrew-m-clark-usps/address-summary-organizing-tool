@@ -32,10 +32,16 @@ const client = new SageMakerRuntimeClient({ region });
  * Parse an address string using the fine-tuned BERT NER endpoint.
  * Falls back gracefully if the endpoint is unavailable.
  *
- * Expected endpoint input/output (HuggingFace token-classification pipeline):
- *   Input:  { "inputs": "123 N Main St Apt 4B Springfield IL 62701" }
- *   Output: [{ "entity": "B-NUM",    "word": "123",    "score": 0.99 },
- *            { "entity": "B-PREDIR", "word": "N",      "score": 0.97 }, ...]
+ * The endpoint can return two formats depending on aggregation_strategy:
+ *   "simple"  (recommended) — HuggingFace pipeline merges sub-word tokens:
+ *     [{ "entity_group": "NUM", "word": "123", "score": 0.99, "start": 0, "end": 3 }, …]
+ *
+ *   "none"  (raw) — one entry per sub-word token:
+ *     [{ "entity": "B-NUM", "word": "123",  "score": 0.99 },
+ *      { "entity": "B-STR", "word": "Main", "score": 0.99 },
+ *      { "entity": "I-STR", "word": "##st", "score": 0.97 }, …]
+ *
+ * Both formats are normalised by _normaliseEntities() before assembly.
  *
  * @param {string} rawAddress
  * @returns {Promise<object|null>}  Structured address components, or null on failure
@@ -54,8 +60,11 @@ export async function parseAddressNer(rawAddress) {
             Body:         Buffer.from(payload)
         }));
 
-        const entities = JSON.parse(Buffer.from(resp.Body).toString());
-        return assembleFromEntities(entities, rawAddress);
+        const raw      = JSON.parse(Buffer.from(resp.Body).toString());
+        // Handle both single-result and array-wrapped responses
+        const entities = Array.isArray(raw) ? raw : (raw.entities || raw);
+        const normalised = _normaliseEntities(entities);
+        return assembleFromEntities(normalised, rawAddress);
     } catch (err) {
         console.warn('[SageMaker] NER endpoint error:', err.message);
         return null;
@@ -63,7 +72,52 @@ export async function parseAddressNer(rawAddress) {
 }
 
 /**
- * Convert BIO-tagged entities to a structured address object.
+ * Normalise HuggingFace entity format to a canonical array of
+ * { entity: string, word: string, score: number } objects.
+ *
+ * Handles both response formats:
+ *   aggregation_strategy="simple"  → { entity_group, word, score }   (no sub-words)
+ *   aggregation_strategy="none"    → { entity, word, score }          (may have ## sub-words)
+ *
+ * For the "none" format, consecutive tokens whose word starts with "##" are
+ * merged (without space) into the preceding token to reconstruct whole words.
+ * The B-/I- prefix is preserved during merging so that consecutive B-* tokens
+ * are treated as separate entity instances, while I-* tokens extend the current.
+ */
+function _normaliseEntities(entities) {
+    if (!Array.isArray(entities)) return [];
+
+    const result = [];
+
+    for (const e of entities) {
+        const rawTag = (e.entity_group || e.entity || 'O');
+        const word   = String(e.word || '');
+        const score  = parseFloat(e.score || 0);
+
+        // Sub-word continuation token (e.g. "##grove") — merge into previous word
+        if (word.startsWith('##') && result.length > 0) {
+            const prev = result[result.length - 1];
+            prev.word  = prev.word + word.slice(2);   // concatenate without space
+            prev.score = (prev.score + score) / 2;    // average score
+            continue;
+        }
+
+        const cleanWord = word.trim();
+        if (!cleanWord) continue;
+
+        // Normalise tag: strip B-/I- prefix for grouping in assembleFromEntities.
+        // For single-address NER there is exactly one instance of each entity type,
+        // so B- vs I- distinction is only needed for sub-word merging (handled above).
+        const entity = rawTag.replace(/^[BI]-/, '');
+
+        result.push({ entity, word: cleanWord, score });
+    }
+
+    return result;
+}
+
+/**
+ * Convert normalised entities to a structured address object.
  *
  * @param {Array<{ entity: string, word: string, score: number }>} entities
  * @param {string} rawAddress
@@ -77,8 +131,8 @@ function assembleFromEntities(entities, rawAddress) {
     };
 
     for (const ent of entities) {
-        const tag  = ent.entity.replace(/^[BI]-/, '');
-        const word = ent.word.replace(/^##/, '');  // HuggingFace subword tokens
+        const tag  = ent.entity;  // already stripped of B-/I- prefix
+        const word = ent.word;
         if (parts[tag]) parts[tag].push(word);
     }
 

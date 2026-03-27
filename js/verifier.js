@@ -948,10 +948,43 @@ const VerifyUI = (() => {
         overlay.style.display = 'flex';
         overlay.setAttribute('aria-hidden', 'false');
 
+        // TF.js neural similarity — computed asynchronously after modal opens
+        const neuralRow = document.getElementById('neural-score-row');
+        const neuralVal = document.getElementById('neural-score-val');
+        if (neuralRow) neuralRow.style.display = 'none';
+        _computeNeuralScore(result);
+
         // Close on overlay click
         overlay.onclick = e => { if (e.target === overlay) closeModal(); };
         // Close on Escape
         document.addEventListener('keydown', escListener);
+    }
+
+    /**
+     * Asynchronously compute TF.js USE neural similarity between the input
+     * address and the USPS standardized result, then show it in the modal.
+     */
+    async function _computeNeuralScore(result) {
+        if (typeof AddressEmbedder === 'undefined') return;
+        const neuralRow = document.getElementById('neural-score-row');
+        const neuralVal = document.getElementById('neural-score-val');
+        if (!neuralRow || !neuralVal) return;
+
+        const inp = result.input        || {};
+        const std = result.standardized || {};
+        const inputText = [inp.street, inp.city, inp.state, inp.zip].filter(Boolean).join(' ');
+        const stdText   = [std.street, std.city, std.state, std.zip].filter(Boolean).join(' ');
+
+        if (!inputText || !stdText) return;
+
+        try {
+            const sim = await AddressEmbedder.similarity(inputText, stdText);
+            if (sim === null) return;
+            const pct = Math.round(sim * 100);
+            neuralVal.textContent = `${pct}% match`;
+            neuralRow.style.display = '';
+            neuralRow.title = `Input: "${inputText}" vs USPS: "${stdText}"`;
+        } catch { /* non-fatal */ }
     }
 
     function escListener(e) {

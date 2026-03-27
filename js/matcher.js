@@ -43,6 +43,88 @@ const AddressMatcher = (() => {
         levenshtein:0.10  // split to 0.05/0.05 when geo is available
     };
 
+    // Neural (TF.js USE) weight: when available, blends into composite score.
+    // Classic weights are scaled down proportionally to make room.
+    const NEURAL_WEIGHT = 0.25;  // 25% of composite score from USE similarity
+
+    /* ─────────────────────────────────────────────────────────
+       Neural similarity helpers (TF.js AddressEmbedder)
+    ───────────────────────────────────────────────────────── */
+
+    /**
+     * Return the neural street similarity score from AddressEmbedder (TF.js USE).
+     * Returns null synchronously if the model is not yet ready — the caller
+     * falls back to classic string metrics in that case.
+     *
+     * @param {string} streetA
+     * @param {string} streetB
+     * @returns {number|null}  0–100, or null if USE unavailable
+     */
+    function getNeuralStreetScore(streetA, streetB) {
+        if (typeof AddressEmbedder === 'undefined' || !AddressEmbedder.isReady()) {
+            return null;
+        }
+        // AddressEmbedder.similarity() is async but we need a synchronous fallback.
+        // We store the latest computed similarity in a lightweight module-level cache.
+        return _neuralCache.get(_neuralKey(streetA, streetB)) ?? null;
+    }
+
+    // Light synchronous cache for the most recent neural similarity computations
+    const _neuralCache = new Map();
+    const _NEURAL_CACHE_MAX = 500;
+
+    function _neuralKey(a, b) {
+        // Build a collision-resistant key using djb2 hash of the full strings.
+        // Avoids false hits for addresses that share a long common prefix.
+        const djb2 = s => {
+            let h = 5381;
+            for (let i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) | 0;
+            return h >>> 0;   // unsigned 32-bit
+        };
+        return `${djb2(String(a || ''))}:${djb2(String(b || ''))}`;
+    }
+
+    /**
+     * Asynchronously pre-warm the neural similarity cache for a pair of records.
+     * Called from matchRecords() after the classic scoring pass, so subsequent
+     * accesses to getNeuralStreetScore() for the same pairs are cache-hits.
+     *
+     * @param {string} streetA
+     * @param {string} streetB
+     * @returns {Promise<void>}
+     */
+    async function prewarmNeuralCache(streetA, streetB) {
+        if (typeof AddressEmbedder === 'undefined') return;
+        const key = _neuralKey(streetA, streetB);
+        if (_neuralCache.has(key)) return;
+        try {
+            const sim = await AddressEmbedder.similarity(streetA, streetB);
+            if (sim !== null) {
+                if (_neuralCache.size >= _NEURAL_CACHE_MAX) {
+                    // Evict oldest entry
+                    _neuralCache.delete(_neuralCache.keys().next().value);
+                }
+                _neuralCache.set(key, Math.round(sim * 100));
+            }
+        } catch { /* non-fatal */ }
+    }
+
+    /**
+     * Enhanced match score that blends classic string metrics with USE neural
+     * similarity when AddressEmbedder is available.
+     *
+     * @param {object} recA
+     * @param {object} recB
+     * @param {number|null} neuralScore  0–100 from AddressEmbedder, or null
+     * @returns {number}  0–100 composite score
+     */
+    function compositeWithNeural(recA, recB, neuralScore) {
+        const classic = calculateCompositeAIScore(recA, recB);
+        if (neuralScore === null) return classic;
+        // Blend: (1 - NEURAL_WEIGHT) × classic  +  NEURAL_WEIGHT × neural
+        return Math.round((1 - NEURAL_WEIGHT) * classic + NEURAL_WEIGHT * neuralScore);
+    }
+
     /**
      * Standardize an address string for matching
      */
@@ -722,7 +804,8 @@ const AddressMatcher = (() => {
             tokenOverlap:   calculateTokenOverlap(sA, sB),
             levenshteinSim: Math.round(levSim),
             geoProximity:   geoProximity !== null ? Math.round(geoProximity) : null,
-            composite:      calculateCompositeAIScore(recA, recB)
+            neural:         getNeuralStreetScore(sA, sB),
+            composite:      compositeWithNeural(recA, recB, getNeuralStreetScore(sA, sB))
         };
     }
 
@@ -751,6 +834,10 @@ const AddressMatcher = (() => {
         calculateRecordCompleteness,
         calculateTokenOverlap,
         calculateCompositeAIScore,
-        getAIScoreBreakdown
+        getAIScoreBreakdown,
+        // TF.js neural similarity
+        getNeuralStreetScore,
+        prewarmNeuralCache,
+        compositeWithNeural
     };
 })();

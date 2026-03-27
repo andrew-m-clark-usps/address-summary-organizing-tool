@@ -398,3 +398,37 @@ variable "kms_key_arn" {
   type        = string
   default     = ""
 }
+
+# ════════════════════════════════════════════════════════════
+# SageMaker NER + Scorer deployment flags
+# ════════════════════════════════════════════════════════════
+
+variable "enable_sagemaker_ner" {
+  description = <<-EOT
+    Deploy the HuggingFace BERT NER endpoint for structured address parsing.
+    Requires model artifact at s3://<bucket>/models/address-ner/model.tar.gz.
+    Set to true after running infrastructure/ml/ner/train.py.
+  EOT
+  type    = bool
+  default = false
+}
+
+variable "enable_sagemaker_scorer" {
+  description = <<-EOT
+    Deploy the XGBoost confidence scoring endpoint.
+    Requires model artifact at s3://<bucket>/models/address-scorer/model.tar.gz.
+    Set to true after running infrastructure/ml/scorer/train.py.
+  EOT
+  type    = bool
+  default = false
+}
+
+variable "sagemaker_ner_memory_mb" {
+  description = "Serverless Inference memory size (MB) for the NER endpoint."
+  type        = number
+  default     = 1024
+  validation {
+    condition     = contains([1024, 2048, 3072, 4096, 5120, 6144], var.sagemaker_ner_memory_mb)
+    error_message = "sagemaker_ner_memory_mb must be one of: 1024, 2048, 3072, 4096, 5120, 6144."
+  }
+}

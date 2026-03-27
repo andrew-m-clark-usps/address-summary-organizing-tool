@@ -75,39 +75,109 @@ resource "aws_iam_role_policy" "sagemaker_s3" {
   })
 }
 
-# ── SageMaker Model (NER — placeholder until fine-tuned artifact is ready) ─
-# Uncomment and populate model_data_url once the NER model artifact is
-# uploaded to S3 from a SageMaker Training Job.
+# ── SageMaker Model (NER — HuggingFace BERT fine-tuned on USPS CASS data) ──
+# Deploys the fine-tuned model artifact from train.py using the HuggingFace
+# PyTorch inference container.
 #
-# resource "aws_sagemaker_model" "ner" {
-#   name               = "${var.project_name}-ner-${var.environment}"
-#   execution_role_arn = aws_iam_role.sagemaker.arn
+# Prerequisites before uncommenting:
+#   1. Run train.py to produce a trained model artifact
+#   2. Upload model.tar.gz to S3: s3://<bucket>/models/address-ner/model.tar.gz
+#   3. Set var.sagemaker_ner_endpoint_name in terraform.tfvars
 #
-#   primary_container {
-#     image          = "763104351884.dkr.ecr.${var.aws_region}.amazonaws.com/huggingface-pytorch-inference:2.1.0-transformers4.37.0-cpu-py310-ubuntu22.04"
-#     model_data_url = "s3://${aws_s3_bucket.site.bucket}/models/address-ner/model.tar.gz"
-#     environment = {
-#       HF_TASK = "token-classification"
-#     }
-#   }
-# }
-#
-# resource "aws_sagemaker_endpoint_configuration" "ner" {
-#   name = "${var.project_name}-ner-cfg-${var.environment}"
-#   production_variants {
-#     variant_name           = "primary"
-#     model_name             = aws_sagemaker_model.ner.name
-#     serverless_config {
-#       memory_size_in_mb = 512
-#       max_concurrency   = 10
-#     }
-#   }
-# }
-#
-# resource "aws_sagemaker_endpoint" "ner" {
-#   name                 = var.sagemaker_ner_endpoint_name
-#   endpoint_config_name = aws_sagemaker_endpoint_configuration.ner.name
-# }
+# The inference.py handler in infrastructure/ml/ner/inference.py is bundled
+# inside the model.tar.gz by the training script.
+
+resource "aws_sagemaker_model" "ner" {
+  count              = var.enable_sagemaker_ner ? 1 : 0
+  name               = "${var.project_name}-ner-${var.environment}"
+  execution_role_arn = aws_iam_role.sagemaker.arn
+
+  primary_container {
+    # HuggingFace PyTorch inference container (GovCloud ECR mirror)
+    image          = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/huggingface-pytorch-inference:2.1.0-transformers4.37.0-cpu-py310-ubuntu22.04"
+    model_data_url = "s3://${aws_s3_bucket.site.bucket}/models/address-ner/model.tar.gz"
+
+    environment = {
+      HF_TASK                    = "token-classification"
+      SAGEMAKER_CONTAINER_LOG_LEVEL = "20"
+    }
+  }
+
+  tags = { Name = "${var.project_name}-ner-${var.environment}" }
+}
+
+resource "aws_sagemaker_endpoint_configuration" "ner" {
+  count = var.enable_sagemaker_ner ? 1 : 0
+  name  = "${var.project_name}-ner-cfg-${var.environment}"
+
+  production_variants {
+    variant_name = "primary"
+    model_name   = aws_sagemaker_model.ner[0].name
+
+    # Serverless Inference — scales to zero, no idle cost
+    serverless_config {
+      memory_size_in_mb = var.sagemaker_ner_memory_mb
+      max_concurrency   = 10
+    }
+  }
+
+  tags = { Name = "${var.project_name}-ner-cfg-${var.environment}" }
+}
+
+resource "aws_sagemaker_endpoint" "ner" {
+  count                = var.enable_sagemaker_ner ? 1 : 0
+  name                 = var.sagemaker_ner_endpoint_name != "" ? var.sagemaker_ner_endpoint_name : "${var.project_name}-ner-${var.environment}"
+  endpoint_config_name = aws_sagemaker_endpoint_configuration.ner[0].name
+
+  tags = { Name = "${var.project_name}-ner-${var.environment}" }
+}
+
+# ── SageMaker Model (XGBoost confidence scorer) ──────────────
+resource "aws_sagemaker_model" "scorer" {
+  count              = var.enable_sagemaker_scorer ? 1 : 0
+  name               = "${var.project_name}-scorer-${var.environment}"
+  execution_role_arn = aws_iam_role.sagemaker.arn
+
+  primary_container {
+    # AWS Scikit-learn container (includes XGBoost)
+    image          = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3"
+    model_data_url = "s3://${aws_s3_bucket.site.bucket}/models/address-scorer/model.tar.gz"
+
+    environment = {
+      SAGEMAKER_CONTAINER_LOG_LEVEL = "20"
+      SAGEMAKER_PROGRAM             = "train.py"
+    }
+  }
+
+  tags = { Name = "${var.project_name}-scorer-${var.environment}" }
+}
+
+resource "aws_sagemaker_endpoint_configuration" "scorer" {
+  count = var.enable_sagemaker_scorer ? 1 : 0
+  name  = "${var.project_name}-scorer-cfg-${var.environment}"
+
+  production_variants {
+    variant_name = "primary"
+    model_name   = aws_sagemaker_model.scorer[0].name
+
+    serverless_config {
+      memory_size_in_mb = 512
+      max_concurrency   = 20
+    }
+  }
+
+  tags = { Name = "${var.project_name}-scorer-cfg-${var.environment}" }
+}
+
+resource "aws_sagemaker_endpoint" "scorer" {
+  count                = var.enable_sagemaker_scorer ? 1 : 0
+  name                 = var.sagemaker_score_endpoint_name != "" ? var.sagemaker_score_endpoint_name : "${var.project_name}-scorer-${var.environment}"
+  endpoint_config_name = aws_sagemaker_endpoint_configuration.scorer[0].name
+
+  tags = { Name = "${var.project_name}-scorer-${var.environment}" }
+}
+
+data "aws_caller_identity" "current" {}
 
 # ── SageMaker CloudWatch Alarms ───────────────────────────────
 # (Activated once real endpoints are deployed)
