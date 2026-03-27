@@ -242,7 +242,240 @@ const AddressVerifier = (() => {
         }
     }
 
-    /* ── Audit log query ─────────────────────────────────────── */
+    /* ── Bedrock AI Address Parser ───────────────────────────── */
+
+    async function parseWithBedrock() {
+        const ta = document.getElementById('bedrock-input');
+        const input = (ta && ta.value.trim()) || '';
+        if (!input) { setStatus('bedrock-status', 'Please enter an address to parse.', 'error'); return; }
+
+        setStatus('bedrock-status', '⟳ Parsing with Bedrock Claude…', 'loading');
+        const resultEl  = document.getElementById('bedrock-result');
+        const contentEl = document.getElementById('bedrock-result-content');
+        if (resultEl)  resultEl.style.display  = 'none';
+
+        const cfg = loadConfig();
+        if (!cfg.apiEndpoint) {
+            setStatus('bedrock-status', '✗ Configure API endpoint first.', 'error');
+            return;
+        }
+
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (cfg.apiKey) headers['x-api-key'] = cfg.apiKey;
+            const resp = await fetch(cfg.apiEndpoint.replace(/\/verify$/, '/parse'), {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ address: input })
+            });
+            if (!resp.ok) throw new Error(`API ${resp.status}`);
+            const parsed = await resp.json();
+
+            if (contentEl) {
+                const fields = [
+                    ['Street Number', parsed.streetNumber],
+                    ['Pre-Directional', parsed.preDir],
+                    ['Street Name', parsed.streetName],
+                    ['Suffix', parsed.streetSuffix],
+                    ['Secondary Unit', parsed.secUnit ? `${parsed.secUnit} ${parsed.secUnitNum || ''}`.trim() : null],
+                    ['City', parsed.city],
+                    ['State', parsed.state],
+                    ['ZIP', parsed.zip5 ? (parsed.zip4 ? `${parsed.zip5}-${parsed.zip4}` : parsed.zip5) : null],
+                    ['Type', parsed.addressType],
+                    ['Confidence', parsed.confidence != null ? `${parsed.confidence}%` : null],
+                    ['Model', parsed.model],
+                    ['Issues', (parsed.issues || []).join('; ') || null]
+                ].filter(([, v]) => v != null && v !== '');
+
+                contentEl.innerHTML = `<div style="display:grid;grid-template-columns:8rem 1fr;gap:0.375rem 0.75rem;font-size:0.82rem;">
+                    ${fields.map(([k, v]) =>
+                        `<span style="color:var(--text-secondary);font-weight:500">${escHtml(k)}</span>
+                         <span>${escHtml(String(v))}</span>`
+                    ).join('')}
+                </div>
+                <button class="btn btn-primary btn-sm" style="margin-top:0.75rem"
+                        onclick="VerifyUI.useBedrockResult()">Use as Address Input →</button>`;
+
+                // Store for "use" button
+                window._lastBedrockResult = parsed;
+            }
+            if (resultEl) resultEl.style.display = 'block';
+            setStatus('bedrock-status', `✓ Parsed (confidence: ${parsed.confidence || 0}%)`, 'success');
+        } catch (err) {
+            setStatus('bedrock-status', `✗ ${err.message}`, 'error');
+        }
+    }
+
+    function useBedrockResult() {
+        const p = window._lastBedrockResult;
+        if (!p) return;
+        const streetEl = document.getElementById('street');
+        const cityEl   = document.getElementById('city');
+        const stateEl  = document.getElementById('state');
+        const zipEl    = document.getElementById('zip');
+
+        if (streetEl) streetEl.value = [p.streetNumber, p.preDir, p.streetName, p.streetSuffix, p.secUnit, p.secUnitNum].filter(Boolean).join(' ');
+        if (cityEl)   cityEl.value   = p.city   || '';
+        if (stateEl)  stateEl.value  = p.state  || '';
+        if (zipEl)    zipEl.value    = p.zip5   || '';
+
+        // Switch to user tab
+        const userTab = document.querySelector('[data-tab="user"]');
+        if (userTab) userTab.click();
+    }
+
+    /* ── Databricks browse ───────────────────────────────────── */
+
+    let browseOffset = 0;
+    let browseTotal  = 0;
+    const BROWSE_LIMIT = 50;
+    let browseDebounce = null;
+
+    function debounceBrowse(val) {
+        clearTimeout(browseDebounce);
+        browseDebounce = setTimeout(() => refreshBrowse(), 400);
+    }
+
+    async function refreshBrowse() {
+        browseOffset = 0;
+        await loadBrowsePage();
+    }
+
+    async function browsePage(direction) {
+        browseOffset = Math.max(0, browseOffset + direction * BROWSE_LIMIT);
+        await loadBrowsePage();
+    }
+
+    async function loadBrowsePage() {
+        const cfg = loadConfig();
+        const container = document.getElementById('browse-table-container');
+        if (!container) return;
+
+        container.innerHTML = '<div class="empty-state"><span class="spinner"></span> Loading from Databricks…</div>';
+
+        if (!cfg.apiEndpoint) {
+            container.innerHTML = '<div class="empty-state">Configure API endpoint to browse the Databricks database.</div>';
+            return;
+        }
+
+        const params = new URLSearchParams({
+            status: (document.getElementById('browse-filter-status') || {}).value || '',
+            state:  (document.getElementById('browse-filter-state')  || {}).value || '',
+            search: (document.getElementById('browse-search')        || {}).value || '',
+            from:   (document.getElementById('browse-filter-from')   || {}).value || '',
+            to:     (document.getElementById('browse-filter-to')     || {}).value || '',
+            limit:  BROWSE_LIMIT,
+            offset: browseOffset
+        });
+
+        const headers = {};
+        if (cfg.apiKey) headers['x-api-key'] = cfg.apiKey;
+        const url = `${cfg.apiEndpoint.replace(/\/verify$/, '')}/browse?${params}`;
+
+        try {
+            const resp = await fetch(url, { method: 'GET', headers });
+            if (!resp.ok) throw new Error(`API ${resp.status}`);
+            const data = await resp.json();
+            browseTotal = data.total || 0;
+            renderBrowseTable(data.records || []);
+            updateBrowsePagination();
+        } catch (err) {
+            container.innerHTML = `<div class="empty-state">Could not load Databricks data: ${escHtml(err.message)}</div>`;
+        }
+    }
+
+    function renderBrowseTable(records) {
+        const container = document.getElementById('browse-table-container');
+        if (!container) return;
+        if (!records.length) { container.innerHTML = '<div class="empty-state">No records found.</div>'; return; }
+
+        const rows = records.map(r => {
+            const statusBadge = `<span class="history-badge badge-${r.status || 'offline'}">${r.status || '—'}</span>`;
+            const ts    = r.verified_at ? new Date(r.verified_at).toLocaleString() : '—';
+            const src   = r.source === 'usps' ? '🏛️ USPS' : r.source === 'bedrock' ? '🤖 Bedrock' :
+                          r.source && r.source.startsWith('sagemaker') ? '🧠 SageMaker' : '📋 Offline';
+            const cache = r.from_cache ? '⚡' : '';
+            return `<tr>
+                <td>${escHtml(r.std_street || '')} ${r.std_city ? `<br><small style="color:var(--text-muted)">${escHtml(r.std_city)}, ${escHtml(r.std_state || '')} ${escHtml(r.std_zip || '')}</small>` : ''}</td>
+                <td>${statusBadge} ${cache}</td>
+                <td>${escHtml(String(r.confidence || 0))}%</td>
+                <td>${escHtml(src)}</td>
+                <td style="white-space:nowrap">${escHtml(ts)}</td>
+                <td>${escHtml(String(r.response_ms || 0))} ms</td>
+            </tr>`;
+        }).join('');
+
+        container.innerHTML = `<div class="audit-table-wrap"><table class="audit-table">
+            <thead><tr>
+                <th>Address</th><th>Status</th><th>Confidence</th>
+                <th>Source</th><th>Verified At</th><th>Latency</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>`;
+    }
+
+    function updateBrowsePagination() {
+        const countEl = document.getElementById('browse-count');
+        const prevEl  = document.getElementById('browse-prev');
+        const nextEl  = document.getElementById('browse-next');
+        const start   = browseOffset + 1;
+        const end     = Math.min(browseOffset + BROWSE_LIMIT, browseTotal);
+        if (countEl) countEl.textContent = browseTotal > 0 ? `${start.toLocaleString()}–${end.toLocaleString()} of ${browseTotal.toLocaleString()} records` : '';
+        if (prevEl) prevEl.disabled = browseOffset === 0;
+        if (nextEl) nextEl.disabled = browseOffset + BROWSE_LIMIT >= browseTotal;
+        const paginEl = document.getElementById('browse-pagination');
+        if (paginEl) paginEl.style.display = browseTotal > 0 ? 'flex' : 'none';
+    }
+
+    function exportBrowse() {
+        const rows = document.querySelectorAll('#browse-table-container .audit-table tbody tr');
+        if (!rows.length) return;
+        const headers = ['Address', 'Status', 'Confidence', 'Source', 'Verified At', 'Latency'];
+        const data = [headers, ...Array.from(rows).map(r =>
+            Array.from(r.querySelectorAll('td')).map(td => td.textContent.replace(/\s+/g,' ').trim())
+        )];
+        downloadCsv(data, 'databricks-records.csv');
+    }
+
+    /* ── Populate state dropdown for browse filter ───────────── */
+    function populateBrowseStateFilter() {
+        const sel = document.getElementById('browse-filter-state');
+        if (!sel) return;
+        const states = [
+            'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+            'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+            'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+            'VA','WA','WV','WI','WY','DC','PR','GU','VI','AS','MP'
+        ];
+        states.forEach(st => {
+            const opt = document.createElement('option');
+            opt.value = st; opt.textContent = st;
+            sel.appendChild(opt);
+        });
+    }
+
+    /* ── Trigger nightly batch job ───────────────────────────── */
+
+    async function triggerBatch() {
+        const cfg = loadConfig();
+        if (!cfg.apiEndpoint) { alert('Configure API endpoint first.'); return; }
+        if (!confirm('Trigger SageMaker Batch Transform job now? This will process all unverified Databricks records.')) return;
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (cfg.apiKey) headers['x-api-key'] = cfg.apiKey;
+
+        try {
+            const resp = await fetch(cfg.apiEndpoint.replace(/\/verify$/, '/batch'), {
+                method: 'POST', headers, body: '{}'
+            });
+            const data = await resp.json();
+            alert(`✅ ${data.message || 'Batch job queued.'}`);
+        } catch (err) {
+            alert(`✗ Failed to trigger batch: ${err.message}`);
+        }
+    }
+
+    /* ── Updated checkStatus (7 services) ───────────────────── */
 
     async function queryAuditLog(config, filters = {}) {
         if (!config || !config.apiEndpoint) throw new Error('API endpoint not configured.');
@@ -500,7 +733,10 @@ const VerifyUI = (() => {
             'status-api':        status.api,
             'status-redis':      status.redis,
             'status-opensearch': status.opensearch,
-            'status-usps':       status.usps
+            'status-usps':       status.usps,
+            'status-databricks': status.databricks,
+            'status-bedrock':    status.bedrock,
+            'status-sagemaker':  status.sagemaker
         };
         Object.entries(map).forEach(([id, state]) => {
             const item   = document.getElementById(id);
@@ -992,6 +1228,7 @@ const VerifyUI = (() => {
     function init() {
         initTabs();
         populateStateSelect('state');
+        populateBrowseStateFilter();
         renderHistory();
 
         // Restore admin if key saved
@@ -1032,6 +1269,13 @@ const VerifyUI = (() => {
         exportBulkResults,
         searchAddresses,
         refreshAuditLog,
-        exportAuditLog
+        exportAuditLog,
+        parseWithBedrock,
+        useBedrockResult,
+        refreshBrowse,
+        browsePage,
+        exportBrowse,
+        debounceBrowse,
+        triggerBatch
     };
 })();

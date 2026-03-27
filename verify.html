@@ -200,6 +200,21 @@
                         <span>USPS API</span>
                         <span class="status-val">—</span>
                     </div>
+                    <div class="status-item" id="status-databricks">
+                        <span class="status-dot unknown" aria-hidden="true"></span>
+                        <span>Databricks</span>
+                        <span class="status-val">—</span>
+                    </div>
+                    <div class="status-item" id="status-bedrock">
+                        <span class="status-dot unknown" aria-hidden="true"></span>
+                        <span>Bedrock (Claude)</span>
+                        <span class="status-val">—</span>
+                    </div>
+                    <div class="status-item" id="status-sagemaker">
+                        <span class="status-dot unknown" aria-hidden="true"></span>
+                        <span>SageMaker NER</span>
+                        <span class="status-val">—</span>
+                    </div>
                 </div>
                 <button class="btn btn-secondary btn-sm mt-2" onclick="VerifyUI.checkStatus()" style="margin-top:0.75rem">
                     ↻ Refresh Status
@@ -225,6 +240,79 @@
                     <span id="bulk-status" class="verify-inline-status" aria-live="polite"></span>
                 </div>
                 <div id="bulk-results" class="bulk-results mt-3" style="display:none"></div>
+            </div>
+
+            <!-- ── AI Address Parser (Bedrock) ── -->
+            <div class="card">
+                <div class="card-title">
+                    🤖 AI Address Parser
+                    <span class="badge" title="Powered by Amazon Bedrock Claude">Bedrock</span>
+                </div>
+                <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+                    Paste a freeform / unstructured address string. Claude 3.5 Haiku will parse it
+                    into USPS component fields (street number, pre-directional, suffix, city, state, ZIP).
+                    Useful for legacy data, handwritten input, or address strings that fail structured parsing.
+                </p>
+                <div class="form-group" style="margin-bottom:0.75rem">
+                    <label for="bedrock-input">Freeform Address Text</label>
+                    <textarea id="bedrock-input" rows="3"
+                              placeholder="e.g. 123 north main street apartment 4B springfield illinois 62701-1234"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="VerifyUI.parseWithBedrock()">🤖 Parse with AI</button>
+                    <span id="bedrock-status" class="verify-inline-status" aria-live="polite"></span>
+                </div>
+                <div id="bedrock-result" class="mt-3" style="display:none">
+                    <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.5rem;color:var(--text-secondary);">PARSED FIELDS</div>
+                    <div id="bedrock-result-content"></div>
+                </div>
+            </div>
+
+            <!-- ── Databricks Browse ── -->
+            <div class="card">
+                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+                    <span>
+                        🗄️ Databricks Address Database
+                        <span class="badge" title="Powered by Databricks Delta Lake">Delta Lake</span>
+                    </span>
+                    <div class="flex gap-2">
+                        <button class="btn btn-secondary btn-sm" onclick="VerifyUI.refreshBrowse()">↻ Refresh</button>
+                        <button class="btn btn-secondary btn-sm" onclick="VerifyUI.exportBrowse()">⬇ Export CSV</button>
+                        <button class="btn btn-secondary btn-sm" onclick="VerifyUI.triggerBatch()" title="Trigger nightly SageMaker batch job now">⚙️ Run Batch</button>
+                    </div>
+                </div>
+                <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+                    Browse verified address records stored in the Databricks Delta Lake warehouse.
+                    All verification results are persisted here. The nightly SageMaker Batch Transform
+                    job processes unverified records from this database.
+                </p>
+                <div class="audit-filters">
+                    <select id="browse-filter-status" onchange="VerifyUI.refreshBrowse()" aria-label="Filter by status">
+                        <option value="">All Statuses</option>
+                        <option value="verified">Verified</option>
+                        <option value="corrected">Corrected</option>
+                        <option value="invalid">Invalid</option>
+                        <option value="offline">Offline</option>
+                    </select>
+                    <select id="browse-filter-state" onchange="VerifyUI.refreshBrowse()" aria-label="Filter by state">
+                        <option value="">All States</option>
+                    </select>
+                    <input type="text"  id="browse-search"   placeholder="Search street or city…"
+                           oninput="VerifyUI.debounceBrowse(this.value)"
+                           style="padding:0.4rem 0.75rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);font-family:inherit;font-size:0.82rem;background:var(--bg-secondary);color:var(--text-primary);">
+                    <input type="date"  id="browse-filter-from" onchange="VerifyUI.refreshBrowse()" aria-label="From date">
+                    <input type="date"  id="browse-filter-to"   onchange="VerifyUI.refreshBrowse()" aria-label="To date">
+                </div>
+                <div id="browse-table-container" aria-live="polite">
+                    <div class="empty-state">Configure API endpoint and click Refresh to browse the Databricks database.</div>
+                </div>
+                <div id="browse-pagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:0.75rem;font-size:0.82rem;color:var(--text-secondary);">
+                    <span id="browse-count"></span>
+                    <div class="flex gap-2">
+                        <button class="btn btn-secondary btn-sm" id="browse-prev" onclick="VerifyUI.browsePage(-1)" disabled>← Prev</button>
+                        <button class="btn btn-secondary btn-sm" id="browse-next" onclick="VerifyUI.browsePage(1)"  disabled>Next →</button>
+                    </div>
+                </div>
             </div>
 
             <!-- ── Address Search (OpenSearch) ── -->
