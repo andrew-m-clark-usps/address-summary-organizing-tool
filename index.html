@@ -26,10 +26,12 @@
         <div class="header-subtitle">Dual-system address matching &amp; analysis with comprehensive visualizations</div>
     </div>
     <div class="flex gap-3 items-center" id="header-landing-actions">
+        <a href="verify.html" class="btn btn-primary btn-sm">🔍 Address Verification</a>
         <a href="samples/sample_system_a.csv" download class="btn btn-secondary btn-sm">⬇ Sample A</a>
         <a href="samples/sample_system_b.csv" download class="btn btn-secondary btn-sm">⬇ Sample B</a>
     </div>
     <div class="flex gap-3 items-center" id="header-analysis-actions" style="display:none">
+        <a href="verify.html" class="btn btn-primary btn-sm">🔍 Address Verification</a>
         <button id="export-pptx-btn" class="btn btn-secondary btn-sm" title="Export analysis to PowerPoint">
             📑 Export PowerPoint
         </button>
@@ -813,6 +815,12 @@
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 
 <!-- Application Scripts -->
+<!-- TensorFlow.js + Universal Sentence Encoder — loaded async for neural address similarity -->
+<!-- Models cache in browser after first load (~25 MB USE Lite). Progressive enhancement: -->
+<!-- classic string matching works immediately; neural blending activates once USE is ready. -->
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.3.3/dist/universal_sentence_encoder.min.js"></script>
+<script src="js/ml/address-embedder.js"></script>
 <script src="js/matcher.js"></script>
 <script src="js/analyzer.js"></script>
 <script src="js/visualizations.js"></script>
