@@ -1,202 +1,162 @@
-# 📊 Address Summary Organizing Tool
+# USPS Address Management Portal
 
-A complete, browser-based tool for analyzing and comparing two datasets of address records — with comprehensive chart visualizations, a PowerPoint export, and AWS GovCloud deployment infrastructure.
+A full-stack admin portal for managing, validating, and analyzing USPS address data. Runs entirely locally — no external cloud services required.
+
+## What's Included
+
+| Mode | Description | Port |
+|------|-------------|------|
+| **React App (production)** | Nginx-served production build | `8080` |
+| **React App (dev)** | Vite dev server with hot reload | `5173` |
+| **Static HTML site** | Original vanilla-JS analysis tool | `8081` |
+
+---
+
+## Quick Start with Docker
+
+> **Requires:** Docker Desktop (or Docker Engine + Compose)
+
+```bash
+# Clone / open the project
+cd address-summary-organizing-tool
+
+# Start everything
+docker compose up --build
+
+# Or start individual services:
+docker compose up react-app        # Production React → http://localhost:8080
+docker compose up react-dev        # Dev React (hot reload) → http://localhost:5173
+docker compose up static-site      # Static HTML tool → http://localhost:8081
+```
+
+**Login credentials for the React portal:** `admin` / `usps2024`
+
+Stop all services:
+
+```bash
+docker compose down
+```
+
+---
+
+## Quick Start without Docker
+
+### React Application
+
+```bash
+# Install dependencies
+npm install
+
+# Development server (hot reload)
+npm run dev
+# → http://localhost:5173
+
+# Production build
+npm run build
+npm run preview
+# → http://localhost:4173
+```
+
+### Static HTML Site
+
+Open `static-index.html` directly in a browser, or serve it with any static file server:
+
+```bash
+npx serve . --listen 8081
+# → http://localhost:8081/static-index.html
+```
 
 ---
 
 ## Features
 
-### Core Capabilities
-- **Dual file upload** — CSV and Excel (.xlsx/.xls), up to 55,000+ records per file
-- **Smart address matching** — exact matching plus fuzzy matching with Levenshtein distance
-- **Address standardization** — Street/St, Avenue/Ave, Road/Rd, Drive/Dr, Boulevard/Blvd, and more
-- **Confidence scoring** — 0–100% match score with configurable field weights (ZIP, State, City, Street)
-- **Field-by-field comparison** — Street, City, State, ZIP with discrepancy detection
-- **No server required** — runs entirely in your browser from the local file system
+### React Admin Portal (`/src`)
 
-### 📊 Charts (9 interactive visualizations)
-1. **Match Distribution Pie** — Perfect / High / Partial / Low / No Match breakdown
-2. **Match Summary Bar** — System A vs B total, matched, unmatched counts
-3. **Top States Geographic Chart** — Stacked bar of matched/unmatched by state (top 15)
-4. **Match Confidence Histogram** — Distribution of records across confidence ranges
-5. **Data Completeness by Field** — System A vs B side-by-side for Street/City/State/ZIP
-6. **Address Quality Pie** — Complete vs missing-field breakdown
-7. **Top Cities Comparison** — Horizontal bar, System A vs System B (top 10)
-8. **Discrepancy Types Donut** — City / State / ZIP / Street mismatch breakdown
-9. **Record Volume Comparison** — Matched overlap vs unique records per system
+- **Login page** — Session-based auth (localStorage), USPS branding
+- **Dashboard** — Statistics cards, address form, interactive Leaflet map, paginated address list
+- **My Addresses** — Full CRUD with IndexedDB persistence via LocalForage
+- **Upload Data** — Drag-and-drop CSV upload for two datasets, chunked PapaParse streaming, address matching algorithm, AI metrics (Precision, Recall, F1, Accuracy), Chart.js visualizations
+- **Settings** — Display preferences, data management, system configuration
 
-### 📑 PowerPoint Export
-Export a complete, professionally formatted **11-slide PowerPoint (.pptx)** presentation:
-- Title slide with record counts
-- Match Summary statistics with color-coded stat boxes
-- All 9 chart images embedded in slides
-- Geographic and city tables
-- Address quality metrics table
-- Discrepancy analysis with counts and percentages
-- Key Findings summary slide
+### Static Analysis Tool (`static-index.html`)
 
-### 💾 Data Exports
-- Matched records CSV (with confidence scores and discrepancy notes)
-- Unmatched System A CSV
-- Unmatched System B CSV
-- Analysis summary CSV
-- Individual chart PNG downloads
-
-### ☁️ AWS GovCloud Infrastructure
-- **Terraform** templates for S3 + CloudFront + OAC + security headers + access logging
-- **CloudFormation** template (alternative to Terraform)
-- **GitHub Actions** CI/CD pipeline for automated GovCloud deployment
-- **Deploy scripts** for Linux/macOS (`deploy.sh`) and Windows (`deploy.ps1`)
-- **IAM least-privilege policy** for the deploy user
-- FedRAMP-aligned security configuration (HTTPS-only, AES-256, security headers)
+- Upload two address CSV/Excel files and run a full match analysis
+- Geographic breakdowns, data quality metrics, AI metrics
+- Export results to CSV and PowerPoint
+- No installation needed — works directly in the browser
 
 ---
 
-## Quick Start (Local / Offline Use)
-
-1. Download or clone this repository
-2. Open `index.html` in Chrome, Firefox, or Edge
-3. Upload two CSV or Excel address files
-4. Click **Run Analysis**
-5. Explore the **Dashboard** tab for all charts
-6. Export to **PowerPoint** or **CSV** from the Export tab
-
-> **No internet, server, or installation required.**
-
----
-
-## AWS GovCloud Deployment
-
-See [`infrastructure/README.md`](infrastructure/README.md) for complete deployment instructions.
-
-### Quick deploy with deploy script
-
-```bash
-# 1. Provision infrastructure (Terraform)
-cd infrastructure/terraform
-terraform init && terraform apply
-
-# 2. Deploy site files
-./scripts/deploy.sh \
-  --bucket  your-bucket-name \
-  --distribution E1ABCDEFGHIJKL \
-  --region  us-gov-west-1
-```
-
-### CI/CD (GitHub Actions)
-
-Push to `main` → auto-deploys to production.  
-Push to `develop` → auto-deploys to staging.
-
-Required secrets: `AWS_ACCESS_KEY_ID_GOVCLOUD`, `AWS_SECRET_ACCESS_KEY_GOVCLOUD`,
-`S3_BUCKET_PROD`, `CLOUDFRONT_DIST_ID_PROD` (and staging equivalents).
-
----
-
-## File Format
-
-Expected CSV/Excel columns (auto-detected, case-insensitive):
-
-| Field | Accepted Column Names |
-|-------|-----------------------|
-| Street | Address, Street, Street Address, Address Line 1, Addr |
-| City | City, Town, Municipality |
-| State | State, ST, Province, State_Code |
-| ZIP | ZIP, ZIP Code, Postal Code, Postal, ZipCode |
-
-Extra columns are preserved in the raw display but do not affect matching.
-
-### Sample files
-- `samples/sample_system_a.csv` — 30 Illinois addresses
-- `samples/sample_system_b.csv` — 30 Illinois addresses with variations and new records
-
----
-
-## Understanding Match Scores
-
-| Score | Label | Meaning |
-|-------|-------|---------|
-| 100% | Perfect | Exact match after standardization |
-| 90–99% | High | Very strong match, minor formatting differences |
-| 70–89% | Partial | Good match, possible ZIP or city variation |
-| 50–69% | Low | Weak match, multiple field differences |
-| <50% | No Match | Records treated as unmatched |
-
-**Scoring weights (configurable in Upload tab):**
-- ZIP code: 40% · State: 30% · City: 20% · Street: 10%
-
----
-
-## Technology Stack
-
-| Library | Version | Purpose |
-|---------|---------|---------|
-| [Papa Parse](https://www.papaparse.com/) | 5.4.1 | CSV parsing |
-| [SheetJS (xlsx)](https://sheetjs.com/) | 0.18.5 | Excel file reading |
-| [Chart.js](https://www.chartjs.org/) | 4.4.3 | Interactive chart visualizations |
-| [PptxGenJS](https://gitbrent.github.io/PptxGenJS/) | 3.12.0 | PowerPoint generation |
-
-All libraries load from CDN. No build step required.
-
----
-
-## File Structure
+## Project Structure
 
 ```
-/
-├── index.html                    Main single-page application
-├── css/
-│   └── styles.css                Dark-theme professional styling
-├── js/
-│   ├── app.js                    Core logic, CSV/PPTX export, UI state
-│   ├── matcher.js                Address matching engine (exact + fuzzy)
-│   ├── analyzer.js               Data analysis functions
-│   └── visualizations.js        Chart.js chart rendering (9 charts)
-├── samples/
-│   ├── sample_system_a.csv       30 sample System A records
-│   └── sample_system_b.csv       30 sample System B records
-├── infrastructure/
-│   ├── terraform/                Terraform IaC for AWS GovCloud
-│   ├── cloudformation/           CloudFormation alternative
-│   ├── iam-deploy-policy.json    Minimum IAM permissions for CI/CD
-│   └── README.md                 Infrastructure deployment guide
-├── scripts/
-│   ├── deploy.sh                 Linux/macOS deploy script
-│   └── deploy.ps1                Windows PowerShell deploy script
-└── .github/workflows/
-    └── deploy.yml                GitHub Actions CI/CD pipeline
+.
+├── src/                        # React application source
+│   ├── components/
+│   │   ├── Auth/               # Login, ProtectedRoute
+│   │   ├── Dashboard/          # Overview, AddressDetails, MapView, AddressList, AnalysisDashboard
+│   │   ├── Layout/             # Header, Sidebar, Layout
+│   │   ├── Settings/           # Settings page
+│   │   └── Upload/             # UploadData with CSV parsing
+│   ├── hooks/                  # useAuth, useAddresses, useAnalysis
+│   ├── services/               # authService, addressService, analysisService
+│   ├── utils/                  # constants, formatters
+│   ├── workers/                # matcherWorker, analyzerWorker (Web Workers)
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+├── public/                     # Static assets
+├── docker/
+│   ├── nginx.conf              # Nginx config for React production build
+│   └── nginx-static.conf       # Nginx config for static HTML site
+├── js/                         # Original vanilla-JS engine
+│   ├── matcher.js              # Address matching algorithms
+│   ├── analyzer.js             # Analysis and AI metrics
+│   ├── visualizations.js       # Chart.js chart definitions
+│   └── app.js                  # Main application logic
+├── css/styles.css              # Static site styles
+├── samples/                    # Sample CSV files for testing
+├── docs/AI_INTEGRATION_PLAN.md # AI roadmap (local/on-premise approaches)
+├── static-index.html           # Original static HTML site
+├── index.html                  # Vite entry point (React app)
+├── docker-compose.yml          # Multi-service Docker setup
+├── Dockerfile                  # React production image (Node build → Nginx)
+├── vite.config.js
+└── package.json
 ```
 
 ---
 
-## Browser Requirements
+## Data Storage
 
-Chrome 90+, Firefox 88+, Edge 90+, Safari 14+ recommended.  
-Internet Explorer is not supported.
+The React portal stores all data client-side:
 
----
+| Data | Storage |
+|------|---------|
+| Login session | `localStorage` |
+| Addresses | IndexedDB via LocalForage |
+| Analysis results | Component state (session only) |
 
-## Performance Notes
-
-- Processing 55,000 records typically completes in 5–20 seconds depending on browser and hardware
-- Chart rendering completes within 2–3 seconds after analysis
-- All processing runs client-side; no data is sent to any server
-
----
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Charts not rendering | Ensure you have run analysis first; check browser console for errors |
-| File won't load | Verify the file is valid CSV or .xlsx/.xls and has address-related column names |
-| PowerPoint export empty | Run analysis completely before exporting; charts must be rendered |
-| Slow on large files | Use Chrome for best performance; close other tabs |
-| Column not detected | Rename columns to match expected names (see File Format section) |
-| CDN libraries fail | Host the tool on S3/CloudFront for a reliable CDN-accessible environment |
+No backend or database is required.
 
 ---
 
-## License
+## Sample Data
 
-MIT — See [LICENSE](LICENSE) for details.
+Sample CSV files for testing are in `samples/`:
+- `sample_system_a.csv` — System A addresses
+- `sample_system_b.csv` — System B addresses
+
+Download links are available on the Upload Data page and in the static HTML tool.
+
+---
+
+## USPS Brand Colors
+
+| Token | Hex |
+|-------|-----|
+| Navy | `#1B3A6B` |
+| Blue | `#004B87` |
+| Red | `#E31837` |
+| White | `#FFFFFF` |
+| Light Gray | `#F5F5F5` |
