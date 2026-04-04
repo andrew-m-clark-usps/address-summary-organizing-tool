@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Production-like static site via Nginx
+  static-site:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development mode with live reload (file watching)
+  dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./index.html:/app/index.html
+      - ./css:/app/css
+      - ./js:/app/js
+      - ./samples:/app/samples
+    environment:
+      - NODE_ENV=development
+
+  # React app development (if react-app/ exists)
+  react-dev:
+    build:
+      context: ./react-app
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./react-app/src:/app/src
+      - ./react-app/public:/app/public
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+    profiles:
+      - react

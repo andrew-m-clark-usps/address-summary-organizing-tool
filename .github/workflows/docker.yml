@@ -1,0 +1,48 @@
+name: Docker Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build static site image
+        run: docker build -t address-tool:latest .
+
+      - name: Start container
+        run: |
+          docker run -d --name address-tool -p 8080:80 address-tool:latest
+          sleep 3
+
+      - name: Health check
+        run: |
+          curl -f http://localhost:8080/health || exit 1
+          curl -f http://localhost:8080/ || exit 1
+
+      - name: Verify static assets
+        run: |
+          curl -sf http://localhost:8080/js/app.js > /dev/null
+          curl -sf http://localhost:8080/css/styles.css > /dev/null
+          curl -sf http://localhost:8080/js/matcher.js > /dev/null
+          curl -sf http://localhost:8080/js/visualizations.js > /dev/null
+          curl -sf http://localhost:8080/js/analyzer.js > /dev/null
+          echo "✅ All static assets accessible"
+
+      - name: Check security headers
+        run: |
+          HEADERS=$(curl -sI http://localhost:8080/)
+          echo "$HEADERS"
+          echo "$HEADERS" | grep -i "x-content-type-options" || echo "⚠️ Missing X-Content-Type-Options"
+          echo "$HEADERS" | grep -i "x-frame-options" || echo "⚠️ Missing X-Frame-Options"
+
+      - name: Stop container
+        if: always()
+        run: docker stop address-tool && docker rm address-tool
