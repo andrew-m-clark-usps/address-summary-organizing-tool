@@ -1059,3 +1059,279 @@ select.filter-input {
     justify-content: center;
     padding: 1rem;
 }
+
+/* ===== SAVINGS REPORT (USPS Postal Dashboard) ===== */
+
+/* Form fields */
+.sr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.sr-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.sr-input {
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    transition: border-color 0.15s;
+}
+
+.sr-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Dashboard container */
+#sr-dashboard {
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+    background: #0d1b3e;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Header row */
+.sr-header-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    background: #0d1b3e;
+    padding: 1.5rem 2rem;
+    gap: 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.sr-header-cell { display: flex; flex-direction: column; gap: 0.3rem; }
+.sr-header-center { align-items: center; text-align: center; }
+.sr-header-right  { align-items: flex-end; text-align: right; }
+
+.sr-header-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #8da4cc;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.sr-header-big {
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+.sr-header-sub {
+    font-size: 0.78rem;
+    color: #6b87b8;
+}
+
+/* Color accents */
+.sr-green  { color: #3de88a !important; }
+.sr-yellow { color: #f5c842 !important; }
+.sr-orange { color: #f5a83e !important; }
+.sr-red    { color: #f56565 !important; }
+.sr-amber  { color: #f5c842 !important; }
+
+/* Cards row */
+.sr-cards-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+}
+
+.sr-result-card {
+    padding: 1.5rem 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+.sr-ame-card { background: #112044; }
+.sr-ai-card  { background: #1a1030; border-left: 2px solid #f56565; }
+
+/* Card header */
+.sr-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.sr-card-icon {
+    font-size: 1.6rem;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    width: 2.8rem;
+    height: 2.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.sr-icon-ame { background: rgba(37,99,235,0.25); }
+.sr-icon-ai  { background: rgba(239,68,68,0.25); }
+
+.sr-card-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: 0.03em;
+}
+
+.sr-card-subtitle {
+    font-size: 0.65rem;
+    color: #6b87b8;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 0.1rem;
+}
+
+.sr-match-pct-block {
+    margin-left: auto;
+    text-align: right;
+}
+
+.sr-match-pct-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #6b87b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.sr-match-pct-val {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+.sr-match-pct-sub {
+    font-size: 0.7rem;
+    color: #6b87b8;
+}
+
+/* Stats row */
+.sr-stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 0.5rem;
+    align-items: start;
+}
+
+.sr-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.sr-stat-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #6b87b8;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    line-height: 1.3;
+}
+
+.sr-stat-val {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+.sr-stat-sub {
+    font-size: 0.68rem;
+    color: #6b87b8;
+}
+
+/* Savings block */
+.sr-savings-block {
+    border-radius: 8px;
+    padding: 0.6rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 120px;
+}
+
+.sr-savings-amber { background: rgba(245,200,66,0.15); border: 1px solid rgba(245,200,66,0.3); }
+
+.sr-savings-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #f5c842;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.sr-savings-val {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #f5c842;
+    line-height: 1.1;
+}
+
+.sr-savings-sub {
+    font-size: 0.65rem;
+    color: #b89a30;
+}
+
+/* Progress bar */
+.sr-bar-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sr-bar-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #6b87b8;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.sr-bar-pct {
+    color: #3b82f6;
+    font-size: 0.75rem;
+}
+
+.sr-progress-track {
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.sr-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+.sr-fill-blue { background: #3b82f6; }
+.sr-fill-red  { background: #f56565; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .sr-header-row    { grid-template-columns: 1fr; }
+    .sr-cards-row     { grid-template-columns: 1fr; }
+    .sr-stats-row     { grid-template-columns: 1fr 1fr; }
+    .sr-header-big    { font-size: 1.8rem; }
+    .sr-header-right, .sr-header-center { align-items: flex-start; text-align: left; }
+}

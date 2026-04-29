@@ -26,6 +26,7 @@
         <div class="header-subtitle">Dual-system address matching &amp; analysis with comprehensive visualizations</div>
     </div>
     <div class="flex gap-3 items-center" id="header-landing-actions">
+        <button id="btn-savings-report-landing" class="btn btn-secondary btn-sm">📬 Savings Report</button>
         <a href="samples/sample_system_a.csv" download class="btn btn-secondary btn-sm">⬇ Sample A</a>
         <a href="samples/sample_system_b.csv" download class="btn btn-secondary btn-sm">⬇ Sample B</a>
     </div>
@@ -178,6 +179,7 @@
     <button class="nav-tab" data-tab="ai-metrics" role="tab">🤖 AI Metrics</button>
     <button class="nav-tab" data-tab="results" role="tab">📋 Detailed Results</button>
     <button class="nav-tab" data-tab="export" role="tab">💾 Export</button>
+    <button class="nav-tab" data-tab="savings-report" role="tab">📬 Savings Report</button>
 </nav>
 
 <main class="main-content">
@@ -802,6 +804,172 @@
         </div>
     </section>
 
+    <!-- ═══════════════ TAB: SAVINGS REPORT ═══════════════ -->
+    <section id="tab-savings-report" class="tab-content fade-in">
+        <div class="section-header">
+            <div>
+                <div class="section-title">📬 USPS Postal Savings Report</div>
+                <div class="section-subtitle">AME + AI address matching performance and carrier route savings</div>
+            </div>
+            <div class="flex gap-2 items-center">
+                <button class="btn btn-secondary btn-sm" id="sr-export-png">⬇ Export PNG</button>
+            </div>
+        </div>
+
+        <!-- Input Form -->
+        <div class="card" id="sr-input-card">
+            <div class="card-title">⚙️ Report Inputs</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem 1.5rem">
+                <label class="sr-field">
+                    <span class="sr-label">Total Addresses Input</span>
+                    <input type="number" id="sr-total" class="sr-input" value="17860" min="1">
+                </label>
+                <label class="sr-field">
+                    <span class="sr-label">Date Range</span>
+                    <input type="text" id="sr-daterange" class="sr-input" value="APR 01 – APR 29, 2026">
+                </label>
+                <label class="sr-field">
+                    <span class="sr-label">Cost per Manually Handled Address ($)</span>
+                    <input type="number" id="sr-cost" class="sr-input" value="0.44" step="0.01" min="0">
+                </label>
+                <label class="sr-field">
+                    <span class="sr-label">AME Addresses Fixed</span>
+                    <input type="number" id="sr-ame-fixed" class="sr-input" value="1762" min="0">
+                </label>
+                <label class="sr-field">
+                    <span class="sr-label">AME Route Matched</span>
+                    <input type="number" id="sr-ame-route" class="sr-input" value="1578" min="0">
+                </label>
+                <label class="sr-field">
+                    <span class="sr-label">AI Addresses Fixed</span>
+                    <input type="number" id="sr-ai-fixed" class="sr-input" value="4671" min="0">
+                </label>
+                <label class="sr-field">
+                    <span class="sr-label">AI Route Matched</span>
+                    <input type="number" id="sr-ai-route" class="sr-input" value="3554" min="0">
+                </label>
+            </div>
+            <div class="mt-3">
+                <button class="btn btn-primary btn-sm" id="sr-recalc">🔄 Recalculate</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Display -->
+        <div id="sr-dashboard">
+            <!-- Header Row -->
+            <div class="sr-header-row">
+                <div class="sr-header-cell">
+                    <div class="sr-header-label">TOTAL ADDRESSES INPUT</div>
+                    <div class="sr-header-big" id="sr-disp-total">17,860</div>
+                    <div class="sr-header-sub" id="sr-disp-daterange">APR 01 – APR 29, 2026 &nbsp;·&nbsp; $0.44 / manually handled address</div>
+                </div>
+                <div class="sr-header-cell sr-header-center">
+                    <div class="sr-header-label">COMBINED MATCH RATE</div>
+                    <div class="sr-header-big sr-green" id="sr-disp-combined-rate">28.73%</div>
+                    <div class="sr-header-sub" id="sr-disp-combined-breakdown">AME 8.83% + AI 19.90%</div>
+                </div>
+                <div class="sr-header-cell sr-header-right">
+                    <div class="sr-header-label">TOTAL SAVINGS</div>
+                    <div class="sr-header-big sr-yellow" id="sr-disp-total-savings">$2,258.08</div>
+                    <div class="sr-header-sub" id="sr-disp-total-savings-sub">5,132 routed × $0.44</div>
+                </div>
+            </div>
+
+            <!-- Results Cards Row -->
+            <div class="sr-cards-row">
+                <!-- AME Card -->
+                <div class="sr-result-card sr-ame-card">
+                    <div class="sr-card-header">
+                        <div class="sr-card-icon sr-icon-ame">⚙️</div>
+                        <div>
+                            <div class="sr-card-title">AME RESULTS</div>
+                            <div class="sr-card-subtitle">ADDRESS MATCHING ENGINE</div>
+                        </div>
+                        <div class="sr-match-pct-block">
+                            <div class="sr-match-pct-label">OVERALL MATCH</div>
+                            <div class="sr-match-pct-val" id="sr-disp-ame-overall">8.83%</div>
+                            <div class="sr-match-pct-sub" id="sr-disp-ame-overall-sub">of 17,860 total</div>
+                        </div>
+                    </div>
+                    <div class="sr-stats-row">
+                        <div class="sr-stat">
+                            <div class="sr-stat-label">ADDRESSES<br>FIXED</div>
+                            <div class="sr-stat-val" id="sr-disp-ame-fixed">1,762</div>
+                            <div class="sr-stat-sub" id="sr-disp-ame-fixed-pct">9.87% of input</div>
+                        </div>
+                        <div class="sr-stat">
+                            <div class="sr-stat-label">ROUTE<br>MATCHED</div>
+                            <div class="sr-stat-val" id="sr-disp-ame-route">1,578</div>
+                            <div class="sr-stat-sub" id="sr-disp-ame-route-sub">of 1,762 fixed</div>
+                        </div>
+                        <div class="sr-stat">
+                            <div class="sr-stat-label">ROUTE MATCH<br>RATE</div>
+                            <div class="sr-stat-val sr-amber" id="sr-disp-ame-rate">89.6%</div>
+                            <div class="sr-stat-sub">carrier route hit</div>
+                        </div>
+                        <div class="sr-savings-block sr-savings-amber">
+                            <div class="sr-savings-label">💰 SAVINGS</div>
+                            <div class="sr-savings-val" id="sr-disp-ame-savings">$694.32</div>
+                            <div class="sr-savings-sub" id="sr-disp-ame-savings-sub">1,578 × $0.44</div>
+                        </div>
+                    </div>
+                    <div class="sr-bar-section">
+                        <span class="sr-bar-label">CARRIER ROUTE MATCH RATE</span>
+                        <span class="sr-bar-label sr-bar-pct" id="sr-disp-ame-bar-pct">89.6%</span>
+                    </div>
+                    <div class="sr-progress-track">
+                        <div class="sr-progress-fill sr-fill-blue" id="sr-ame-bar" style="width:89.6%"></div>
+                    </div>
+                </div>
+
+                <!-- AI Card -->
+                <div class="sr-result-card sr-ai-card">
+                    <div class="sr-card-header">
+                        <div class="sr-card-icon sr-icon-ai">🤖</div>
+                        <div>
+                            <div class="sr-card-title">AI RESULTS</div>
+                            <div class="sr-card-subtitle">ADDITIONAL RECOVERY</div>
+                        </div>
+                        <div class="sr-match-pct-block">
+                            <div class="sr-match-pct-label">ADDITIONAL MATCH</div>
+                            <div class="sr-match-pct-val sr-orange" id="sr-disp-ai-overall">19.90%</div>
+                            <div class="sr-match-pct-sub" id="sr-disp-ai-overall-sub">of 17,860 total</div>
+                        </div>
+                    </div>
+                    <div class="sr-stats-row">
+                        <div class="sr-stat">
+                            <div class="sr-stat-label">ADDRESSES<br>FIXED</div>
+                            <div class="sr-stat-val sr-red" id="sr-disp-ai-fixed">4,671</div>
+                            <div class="sr-stat-sub" id="sr-disp-ai-fixed-pct">26.15% of input</div>
+                        </div>
+                        <div class="sr-stat">
+                            <div class="sr-stat-label">ROUTE<br>MATCHED</div>
+                            <div class="sr-stat-val" id="sr-disp-ai-route">3,554</div>
+                            <div class="sr-stat-sub" id="sr-disp-ai-route-sub">of 4,671 fixed</div>
+                        </div>
+                        <div class="sr-stat">
+                            <div class="sr-stat-label">ROUTE MATCH<br>RATE</div>
+                            <div class="sr-stat-val sr-red" id="sr-disp-ai-rate">76.1%</div>
+                            <div class="sr-stat-sub">carrier route hit</div>
+                        </div>
+                        <div class="sr-savings-block sr-savings-amber">
+                            <div class="sr-savings-label">💰 SAVINGS</div>
+                            <div class="sr-savings-val" id="sr-disp-ai-savings">$1,563.76</div>
+                            <div class="sr-savings-sub" id="sr-disp-ai-savings-sub">3,554 × $0.44</div>
+                        </div>
+                    </div>
+                    <div class="sr-bar-section">
+                        <span class="sr-bar-label">CARRIER ROUTE MATCH RATE</span>
+                        <span class="sr-bar-label sr-bar-pct sr-red" id="sr-disp-ai-bar-pct">76.1%</span>
+                    </div>
+                    <div class="sr-progress-track">
+                        <div class="sr-progress-fill sr-fill-red" id="sr-ai-bar" style="width:76.1%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
 </main>
 
 </div><!-- /#analysis-view -->
@@ -811,6 +979,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <!-- Application Scripts -->
 <script src="js/matcher.js"></script>
@@ -836,6 +1005,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (matchedEl) observer.observe(matchedEl, { childList: true, characterData: true, subtree: true });
 });
 </script>
+<!-- Savings Report Logic -->
+<script src="js/savings-report.js"></script>
 
 </body>
 </html>
