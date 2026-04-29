@@ -38,8 +38,10 @@ const SavingsReport = (() => {
 
         // Header
         el('sr-disp-total').textContent        = fmt(total);
-        el('sr-disp-daterange').innerHTML      =
-            dateRange + ' &nbsp;·&nbsp; ' + money(cost) + ' / manually handled address';
+        const dateEl = el('sr-disp-daterange');
+        dateEl.textContent = '';
+        const dateText = document.createTextNode(dateRange + ' \u00b7 ' + money(cost) + ' / manually handled address');
+        dateEl.appendChild(dateText);
         el('sr-disp-combined-rate').textContent = pct(combinedPct);
         el('sr-disp-combined-breakdown').textContent =
             'AME ' + pct(ameOverallPct) + ' + AI ' + pct(aiOverallPct);
